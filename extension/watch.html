@@ -55,6 +55,10 @@
   .device .name div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .device .name small { color: var(--text-3); font-size: 12px; }
   .empty { color: var(--text-3); }
+  .more { margin-top: 12px; }
+  .device .name input { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--accent); border-radius: 8px; padding: 3px 8px; width: 100%; outline: none; }
+  .device .actions { display: flex; gap: 2px; flex: none; }
+  button.quiet.rename:hover { color: var(--text); }
   a { color: var(--accent); }
   [hidden] { display: none !important; }
   @media (max-width: 460px) { .pair { grid-template-columns: 1fr; } }
@@ -66,8 +70,9 @@
   <p class="lede">Talk to your chats, your sparks and their team chats from your wrist.</p>
 
   <div class="card reach" id="unreachable" hidden>
-    <p>Your watch can't reach this computer yet. Turn on network access so it can over your Wi-Fi, or turn on the public link in Settings to reach it from anywhere.</p>
+    <p>Your watch can't reach this computer yet. Turn on network access so it can over your Wi-Fi, or a public link to reach it from anywhere.</p>
     <button type="button" class="primary" id="lan">Turn on network access</button>
+    <button type="button" id="tunnel">Turn on a public link</button>
   </div>
 
   <div id="pairing">
@@ -124,7 +129,15 @@ function shown(address) {
 async function newCode() {
   let made;
   try { made = await Flash.request("device-pair"); } catch (error) { Flash.toast(error.message || "Couldn't make a code"); return; }
-  const addresses = made.addresses || [];
+  drawAddresses(made.addresses || []);
+  $("#code").textContent = `${made.code.slice(0, 3)} ${made.code.slice(3)}`;
+  $("#code").classList.remove("gone");
+  expires = made.expires * 1000;
+  used = false;
+  tick();
+}
+
+function drawAddresses(addresses) {
   $("#unreachable").hidden = addresses.length > 0;
   $("#pairing").hidden = addresses.length === 0;
   const box = $("#addresses");
@@ -137,11 +150,38 @@ async function newCode() {
     const small = row.appendChild(document.createElement("small"));
     small.textContent = note;
   }
-  $("#code").textContent = `${made.code.slice(0, 3)} ${made.code.slice(3)}`;
-  $("#code").classList.remove("gone");
-  expires = made.expires * 1000;
-  used = false;
-  tick();
+  // Only on the Wi-Fi: offer the public link too. A paired watch learns
+  // it by itself, with nothing to type.
+  if (!addresses.some((a) => a.startsWith("https:"))) {
+    const more = box.appendChild(document.createElement("button"));
+    more.type = "button";
+    more.className = "link more";
+    more.textContent = "Reach it from anywhere too";
+    more.onclick = () => openTunnel(more);
+  }
+}
+
+// The computer's tunnel, on: through the service it used last, or the
+// first one it has. It answers once Flash is reachable through it.
+async function openTunnel(button) {
+  const said = button.textContent;
+  button.disabled = true;
+  button.textContent = "Opening a public link...";
+  try {
+    const info = await Flash.request("tunnel");
+    if (info.tunnel.state !== "on") {
+      const installed = info.services.filter((s) => s.installed).map((s) => s.name);
+      const pick = installed.includes(info.tunnel.service) ? info.tunnel.service : installed[0];
+      if (!pick) { Flash.toast('Set up a tunnel first: Settings, "Open from anywhere"'); return; }
+      await Flash.request("tunnel", pick);
+    }
+    drawAddresses((await Flash.request("addresses")).addresses || []);
+    Flash.toast("Paired watches will use the public link away from your Wi-Fi");
+  } catch (error) {
+    Flash.toast(error.message || "Couldn't open a public link");
+  } finally {
+    if (button.isConnected) { button.disabled = false; button.textContent = said; }
+  }
 }
 
 function tick() {
@@ -165,6 +205,8 @@ function when(seconds) {
 }
 
 async function listDevices() {
+  // Not while a name is being typed: it would be drawn away.
+  if (document.activeElement && document.activeElement.closest("#devices input")) return;
   let found;
   try { found = (await Flash.request("browsers")).browsers || []; } catch { return; }
   const box = $("#devices");
@@ -181,7 +223,14 @@ async function listDevices() {
     row.querySelector(".dot").classList.toggle("on", Date.now() / 1000 - watch.seen < 60);
     row.querySelector(".name div").textContent = watch.device;
     row.querySelector(".name small").textContent = `Last seen ${when(watch.seen)}`;
-    const out = row.appendChild(document.createElement("button"));
+    const actions = row.appendChild(document.createElement("span"));
+    actions.className = "actions";
+    const rename = actions.appendChild(document.createElement("button"));
+    rename.type = "button";
+    rename.className = "quiet rename";
+    rename.textContent = "Rename";
+    rename.onclick = () => renameWatch(watch, row.querySelector(".name div"));
+    const out = actions.appendChild(document.createElement("button"));
     out.type = "button";
     out.className = "quiet";
     out.textContent = "Sign out";
@@ -194,7 +243,44 @@ async function listDevices() {
   }
 }
 
+// A name of your own, such as "Simulator": Enter or leaving the box
+// keeps it, Esc puts it back, and an empty one goes back to the watch's.
+function renameWatch(watch, where) {
+  if (where.querySelector("input")) return;
+  const box = document.createElement("input");
+  box.type = "text";
+  box.maxLength = 40;
+  box.value = watch.named ? watch.device : "";
+  box.placeholder = watch.kind || watch.device;
+  box.setAttribute("aria-label", "Name");
+  where.textContent = "";
+  where.appendChild(box);
+  box.focus();
+  box.select();
+  let done = false;
+  const finish = async (keep) => {
+    if (done) return;
+    done = true;
+    const to = box.value.trim();
+    // Out of the way first: the list is not redrawn while a box is in it.
+    box.onblur = null;
+    box.remove();
+    where.textContent = keep && to ? to : watch.device;
+    if (keep && to !== (watch.named ? watch.device : "")) {
+      try { await Flash.request("device-rename", watch.id, { to }); }
+      catch (error) { Flash.toast(error.message || "Couldn't rename it"); }
+    }
+    listDevices();
+  };
+  box.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    if (e.key === "Escape") { e.preventDefault(); finish(false); }
+  };
+  box.onblur = () => finish(true);
+}
+
 $("#again").onclick = newCode;
+$("#tunnel").onclick = () => openTunnel($("#tunnel"));
 $("#lan").onclick = async () => {
   try { await Flash.request("lan", "on"); } catch (error) { Flash.toast(error.message || "Couldn't turn it on"); return; }
   Flash.toast("Network access is on");

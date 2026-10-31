@@ -122,12 +122,19 @@ struct Row: View {
     var warn = false
 
     var body: some View {
-        HStack {
-            if icon.isEmpty {
-                Text(title)
-            } else {
-                Label(title, systemImage: icon)
+        HStack(spacing: 8) {
+            if !icon.isEmpty {
+                // Sized to fit a fixed box: a wide symbol such as three
+                // people would otherwise run off the edge of the row.
+                Image(systemName: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 20)
+                    .foregroundStyle(Color.accentColor)
             }
+            Text(title)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
             Spacer()
             if count > 0 {
                 Text("\(count)")

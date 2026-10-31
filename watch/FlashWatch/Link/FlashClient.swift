@@ -26,7 +26,10 @@ enum LinkError: LocalizedError, Equatable {
 
 /// The computer running Flash, and this watch's key to it.
 struct Pairing: Equatable {
+    /// The address that answered last: tried first.
     var address: String
+    /// Every address Flash is known at: on the Wi-Fi, and its public link.
+    var addresses: [String]
     var key: String
 }
 
@@ -41,19 +44,31 @@ struct FlashClient {
 
     let base: String
     let key: String
+    /// How long a request may take before the address counts as down.
+    var timeout: TimeInterval = 10
 
-    init(base: String, key: String = "") {
+    init(base: String, key: String = "", timeout: TimeInterval = 10) {
         self.base = base
         self.key = key
+        self.timeout = timeout
     }
 
-    init(_ pairing: Pairing) {
-        self.init(base: pairing.address, key: pairing.key)
+    /// The same, for a request that takes its time, such as starting
+    /// the computer's tunnel.
+    var slow: FlashClient { FlashClient(base: base, key: key, timeout: 150) }
+
+    static func hostOf(_ address: String) -> String {
+        URLComponents(string: address)?.host ?? address
+    }
+
+    /// Whether ADDRESS is on the network here, rather than the internet.
+    static func isLocal(_ address: String) -> Bool {
+        onNetwork(hostOf(address))
     }
 
     private static let session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForRequest = 150
         config.httpCookieStorage = nil
         config.httpShouldSetCookies = false
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -130,7 +145,7 @@ struct FlashClient {
 
     private func call(_ path: String, body: [String: Any]?) async throws -> JSON {
         guard let url = URL(string: base + path) else { throw LinkError.badAddress }
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, timeoutInterval: timeout)
         request.setValue(Self.agent, forHTTPHeaderField: "User-Agent")
         if !key.isEmpty {
             request.setValue(key, forHTTPHeaderField: "X-Flash-Device")

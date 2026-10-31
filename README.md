@@ -59,7 +59,15 @@ the app on your watch.
    six digit code. Open Flash on the watch and type both. The code works
    once, for five minutes.
 
-To try it in the simulator instead: `scripts/watch.sh sim`.
+To try it in the simulator instead: `scripts/watch.sh sim`. A simulator
+pairs as "(Simulator)", and any watch can be renamed under **Watch** in
+Flash.
+
+5. **Away from your Wi-Fi.** In the watch's Settings, tap **Reach from
+   anywhere**. It turns on your computer's tunnel and learns its address,
+   so there is nothing to type, and keeps the Wi-Fi address too. The
+   watch uses whichever one answers, and goes back to the Wi-Fi when you
+   are home. The same button is under **Watch** in Flash.
 
 ## How it works
 
@@ -70,7 +78,9 @@ minutes, or after five wrong tries. Each paired watch is listed under
 forgets the key there.
 
 On your Wi-Fi the watch talks to Flash over plain HTTP, like a phone on
-the same network does. Use the public link for HTTPS.
+the same network does. The public link is HTTPS. A tunnel gets a new
+address each time it starts; the watch asks Flash for the current one
+every minute, so it keeps up by itself.
 
 ## Layout
 

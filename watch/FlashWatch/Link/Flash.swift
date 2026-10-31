@@ -18,15 +18,9 @@ final class Flash: ObservableObject {
     init() {
         if let address = Keychain.read("address"), let key = Keychain.read("key"),
            !address.isEmpty, !key.isEmpty {
-            pairing = Pairing(address: address, key: key)
+            let all = (Keychain.read("addresses") ?? "").split(separator: "\n").map(String.init)
+            pairing = Pairing(address: address, addresses: all.isEmpty ? [address] : all, key: key)
         }
-    }
-
-    private var client: FlashClient? { pairing.map { FlashClient($0) } }
-
-    private func linked() throws -> FlashClient {
-        guard let client else { throw LinkError.signedOut }
-        return client
     }
 
     // Pairing --------------------------------------------------------
@@ -35,12 +29,23 @@ final class Flash: ObservableObject {
         let address = try FlashClient.normalized(typed)
         let code = try FlashClient.code(typedCode)
         let key = try await FlashClient(base: address)
-            .pair(code: code, name: WKInterfaceDevice.current().name)
-        Keychain.write(address, for: "address")
+            .pair(code: code, name: Self.deviceName)
         Keychain.write(key, for: "key")
         signedOutNote = nil
-        pairing = Pairing(address: address, key: key)
+        save(Pairing(address: address, addresses: [address], key: key))
+        await syncAddresses(force: true)
         await refresh()
+    }
+
+    /// What the computer lists this watch as, until it is renamed there:
+    /// a simulator says so, to tell it from the watch on your wrist.
+    static var deviceName: String {
+        let name = WKInterfaceDevice.current().name
+        #if targetEnvironment(simulator)
+        return "\(name) (Simulator)"
+        #else
+        return name
+        #endif
     }
 
     func unpair(note: String? = nil) {
@@ -57,14 +62,96 @@ final class Flash: ObservableObject {
     /// The address it was paired with, to offer again when pairing anew.
     var lastAddress: String { pairing?.address ?? Keychain.read("address") ?? "" }
 
-    /// Runs WORK, and signs out if the computer no longer knows this watch.
+    private func save(_ found: Pairing) {
+        Keychain.write(found.address, for: "address")
+        Keychain.write(found.addresses.joined(separator: "\n"), for: "addresses")
+        pairing = found
+    }
+
+    /// Runs WORK against the address that answered last, then the others:
+    /// on the Wi-Fi at home, through the public link away from it. Signs
+    /// out if the computer no longer knows this watch.
     @discardableResult
     func run<T>(_ work: (FlashClient) async throws -> T) async throws -> T {
-        do {
-            return try await work(try linked())
-        } catch LinkError.signedOut {
-            unpair(note: LinkError.signedOut.errorDescription)
-            throw LinkError.signedOut
+        guard let pairing else { throw LinkError.signedOut }
+        let order = [pairing.address] + pairing.addresses.filter { $0 != pairing.address }
+        var failed: Error = LinkError.unreachable(FlashClient.hostOf(pairing.address))
+        for address in order {
+            do {
+                let result = try await work(FlashClient(base: address, key: pairing.key))
+                if address != self.pairing?.address, var now = self.pairing {
+                    now.address = address
+                    save(now)
+                }
+                return result
+            } catch LinkError.unreachable(let host) {
+                failed = LinkError.unreachable(order.count > 1 ? "any of its addresses" : host)
+                continue
+            } catch LinkError.signedOut {
+                unpair(note: LinkError.signedOut.errorDescription)
+                throw LinkError.signedOut
+            }
+        }
+        throw failed
+    }
+
+    // Addresses ------------------------------------------------------
+
+    private var syncedAt = Date.distantPast
+
+    /// The public link, while the computer has one on.
+    var publicAddress: String? { pairing?.addresses.first { !FlashClient.isLocal($0) } }
+
+    /// Asks Flash where it can be reached now, so the public link (a new
+    /// one each time the tunnel starts) never has to be typed. Addresses
+    /// on the Wi-Fi stay, even while the computer is off it; a public
+    /// link that ended goes.
+    func syncAddresses(force: Bool = false) async {
+        guard pairing != nil, force || Date().timeIntervalSince(syncedAt) > 60 else { return }
+        syncedAt = Date()
+        guard let told = try? await run({ try await $0.command("addresses") }),
+              var now = pairing else { return }
+        let found = told["addresses"].array.map(\.string).filter { !$0.isEmpty }
+        var all: [String] = []
+        for address in found + now.addresses.filter(FlashClient.isLocal) where !all.contains(address) {
+            all.append(address)
+        }
+        // Wi-Fi first: at home it is the quicker way.
+        all.sort { FlashClient.isLocal($0) && !FlashClient.isLocal($1) }
+        guard !all.isEmpty else { return }
+        now.addresses = all
+        if !all.contains(now.address) { now.address = all[0] }
+        save(now)
+
+        // Back home on the public link: the Wi-Fi again, once it answers.
+        if !FlashClient.isLocal(now.address), let home = all.first(where: FlashClient.isLocal),
+           (try? await FlashClient(base: home, key: now.key, timeout: 3).get("/api/state?lite=1")) != nil,
+           var back = pairing {
+            back.address = home
+            save(back)
+        }
+    }
+
+    /// Turns on the computer's tunnel, if it is not on, and learns its
+    /// address: Flash from anywhere, with nothing to type.
+    func openPublicLink() async throws {
+        let info = try await run { try await $0.command("tunnel") }
+        if info["tunnel"]["state"].string != "on" {
+            let installed = info["services"].array
+                .filter { $0["installed"].bool }
+                .map { $0["name"].string }
+            let last = info["tunnel"]["service"].string
+            guard let service = installed.contains(last) ? last : installed.first else {
+                throw LinkError.refused(
+                    "Your computer needs a tunnel program first. In Flash, open Settings and find \"Open from anywhere\".")
+            }
+            // Starting one takes a while: it waits until Flash answers
+            // through it.
+            try await run { try await $0.slow.command("tunnel", arg: service) }
+        }
+        await syncAddresses(force: true)
+        guard publicAddress != nil else {
+            throw LinkError.refused("The tunnel started, but Flash didn't say its address. Try again.")
         }
     }
 
@@ -72,6 +159,7 @@ final class Flash: ObservableObject {
 
     func refresh() async {
         guard pairing != nil else { return }
+        await syncAddresses()
         do {
             let state = try await run { try await $0.get("/api/state?lite=1") }
             let roster = try await run { try await $0.command("sparks") }

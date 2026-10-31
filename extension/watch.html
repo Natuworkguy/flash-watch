@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Watch</title>
+<style>
+  /* Flash's own colours and fonts, copied in from the page on load. */
+  :root {
+    --bg: #262624; --surface: #30302e; --border: rgba(222, 220, 209, 0.13);
+    --text: #f5f4ef; --text-2: #c3c0b6; --text-3: #8f8c84;
+    --accent: #d97757; --accent-text: #fff; --del: #ef6b6b; --add: #62c073;
+    --hover: rgba(255, 255, 255, 0.055);
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --serif: "Newsreader", "Iowan Old Style", Georgia, serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.55 var(--sans); }
+  main { max-width: 560px; margin: 0 auto; padding: 40px 20px 60px; }
+  h1 { font: 400 30px/1.2 var(--serif); margin: 0 0 6px; letter-spacing: -0.01em; }
+  h2 { font: 600 12px/1 var(--sans); text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin: 34px 0 12px; }
+  p { margin: 0; color: var(--text-2); }
+  .lede { margin-bottom: 26px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .steps { display: grid; gap: 14px; counter-reset: step; }
+  .step { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; }
+  .step::before { counter-increment: step; content: counter(step); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--hover); color: var(--text-2); border: 1px solid var(--border); }
+  .step b { color: var(--text); font-weight: 600; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .pair > div { background: var(--surface); padding: 18px 20px; min-width: 0; }
+  .label { font-size: 12px; color: var(--text-3); margin-bottom: 6px; }
+  .code { font: 500 34px/1.1 var(--mono); letter-spacing: 0.06em; color: var(--text); font-variant-numeric: tabular-nums; }
+  .code.gone { color: var(--text-3); text-decoration: line-through; }
+  .address { font: 500 17px/1.3 var(--mono); color: var(--text); word-break: break-all; }
+  .address + .address { margin-top: 8px; }
+  .address small { display: block; font: 12px/1.4 var(--sans); color: var(--text-3); }
+  .meta { margin-top: 10px; font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 10px; }
+  button { font: inherit; font-size: 13px; color: var(--text); background: var(--hover); border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+  button:hover { border-color: var(--text-3); }
+  button.primary { background: var(--accent); border-color: transparent; color: var(--accent-text); }
+  button.quiet { background: none; border-color: transparent; color: var(--text-3); padding: 4px 8px; }
+  button.quiet:hover { color: var(--del); }
+  button.link { background: none; border: 0; padding: 0; color: var(--accent); }
+  button.link:hover { text-decoration: underline; }
+  .reach { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .reach p { margin-bottom: 14px; }
+  .devices { display: grid; gap: 0; }
+  .device { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
+  .device:first-child { border-top: 0; padding-top: 0; }
+  .device:last-child { padding-bottom: 0; }
+  .device .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); flex: none; }
+  .device .dot.on { background: var(--add); }
+  .device .name { flex: 1; min-width: 0; }
+  .device .name div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .device .name small { color: var(--text-3); font-size: 12px; }
+  .empty { color: var(--text-3); }
+  a { color: var(--accent); }
+  [hidden] { display: none !important; }
+  @media (max-width: 460px) { .pair { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Apple Watch</h1>
+  <p class="lede">Talk to your chats, your sparks and their team chats from your wrist.</p>
+
+  <div class="card reach" id="unreachable" hidden>
+    <p>Your watch can't reach this computer yet. Turn on network access so it can over your Wi-Fi, or turn on the public link in Settings to reach it from anywhere.</p>
+    <button type="button" class="primary" id="lan">Turn on network access</button>
+  </div>
+
+  <div id="pairing">
+    <div class="pair">
+      <div>
+        <div class="label">Address</div>
+        <div id="addresses"></div>
+      </div>
+      <div>
+        <div class="label">Code</div>
+        <div class="code" id="code">······</div>
+        <div class="meta"><span id="left"></span><button type="button" class="link" id="again">New code</button></div>
+      </div>
+    </div>
+  </div>
+
+  <h2>How to pair</h2>
+  <div class="card steps">
+    <div class="step"><span>Put <b>Flash</b> on your watch. See <a href="https://github.com/Natuworkguy/flash-watch#readme" target="_blank" rel="noopener">the guide</a>.</span></div>
+    <div class="step"><span>Open it, and type the <b>address</b> and the <b>code</b> above.</span></div>
+    <div class="step"><span>That's it. The code works once, for five minutes.</span></div>
+  </div>
+
+  <h2>Paired watches</h2>
+  <div class="card devices" id="devices"><p class="empty">None yet.</p></div>
+</main>
+<script>
+"use strict";
+const Flash = parent.Flash;
+const $ = (s) => document.querySelector(s);
+const DEFAULT_PORT = "7433";
+let expires = 0;
+let timer = 0;
+let used = false;
+
+// Flash's own look, whichever theme it is in.
+(function borrowTheme() {
+  const from = getComputedStyle(parent.document.documentElement);
+  for (const name of ["--bg", "--surface", "--border", "--text", "--text-2", "--text-3", "--accent",
+                      "--accent-text", "--del", "--add", "--hover", "--sans", "--serif", "--mono"]) {
+    const value = from.getPropertyValue(name).trim();
+    if (value) document.documentElement.style.setProperty(name, value);
+  }
+})();
+
+// What to type on the watch: as little as will do. The watch adds
+// Flash's port to an address on the network, and https to a name.
+function shown(address) {
+  const url = new URL(address);
+  if (url.protocol === "https:") return { text: url.host, note: "From anywhere" };
+  return { text: url.port && url.port !== DEFAULT_PORT ? url.host : url.hostname, note: "On your Wi-Fi" };
+}
+
+async function newCode() {
+  let made;
+  try { made = await Flash.request("device-pair"); } catch (error) { Flash.toast(error.message || "Couldn't make a code"); return; }
+  const addresses = made.addresses || [];
+  $("#unreachable").hidden = addresses.length > 0;
+  $("#pairing").hidden = addresses.length === 0;
+  const box = $("#addresses");
+  box.textContent = "";
+  for (const address of addresses) {
+    const { text, note } = shown(address);
+    const row = box.appendChild(document.createElement("div"));
+    row.className = "address";
+    row.textContent = text;
+    const small = row.appendChild(document.createElement("small"));
+    small.textContent = note;
+  }
+  $("#code").textContent = `${made.code.slice(0, 3)} ${made.code.slice(3)}`;
+  $("#code").classList.remove("gone");
+  expires = made.expires * 1000;
+  used = false;
+  tick();
+}
+
+function tick() {
+  clearTimeout(timer);
+  const left = Math.max(0, Math.round((expires - Date.now()) / 1000));
+  if (!left) {
+    $("#code").classList.add("gone");
+    $("#left").textContent = used ? "Used" : "Expired";
+    return;
+  }
+  $("#left").textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} left`;
+  timer = setTimeout(tick, 1000);
+}
+
+function when(seconds) {
+  const gone = Date.now() / 1000 - seconds;
+  if (gone < 90) return "just now";
+  if (gone < 3600) return `${Math.round(gone / 60)} min ago`;
+  if (gone < 86400) return `${Math.round(gone / 3600)} h ago`;
+  return new Date(seconds * 1000).toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+async function listDevices() {
+  let found;
+  try { found = (await Flash.request("browsers")).browsers || []; } catch { return; }
+  const box = $("#devices");
+  box.textContent = "";
+  const watches = found.filter((b) => b.paired);
+  if (!watches.length) {
+    box.innerHTML = '<p class="empty">None yet.</p>';
+    return;
+  }
+  for (const watch of watches) {
+    const row = box.appendChild(document.createElement("div"));
+    row.className = "device";
+    row.innerHTML = '<span class="dot"></span><span class="name"><div></div><small></small></span>';
+    row.querySelector(".dot").classList.toggle("on", Date.now() / 1000 - watch.seen < 60);
+    row.querySelector(".name div").textContent = watch.device;
+    row.querySelector(".name small").textContent = `Last seen ${when(watch.seen)}`;
+    const out = row.appendChild(document.createElement("button"));
+    out.type = "button";
+    out.className = "quiet";
+    out.textContent = "Sign out";
+    out.onclick = async () => {
+      out.disabled = true;
+      try { await Flash.request("sign-out", watch.id); Flash.toast(`${watch.device} is signed out`); }
+      catch (error) { Flash.toast(error.message || "Couldn't sign it out"); }
+      listDevices();
+    };
+  }
+}
+
+$("#again").onclick = newCode;
+$("#lan").onclick = async () => {
+  try { await Flash.request("lan", "on"); } catch (error) { Flash.toast(error.message || "Couldn't turn it on"); return; }
+  Flash.toast("Network access is on");
+  setTimeout(newCode, 1500);
+};
+
+// A watch that pairs uses the code up: say so, and show it in the list.
+const stops = [
+  Flash.on("paired", (event) => {
+    Flash.toast(event.name ? `Paired with ${event.name}` : "Watch paired");
+    expires = 0;
+    used = true;
+    tick();
+    listDevices();
+  }),
+  Flash.on("browsers", listDevices),
+];
+addEventListener("pagehide", () => {
+  for (const stop of stops) stop();
+  Flash.request("device-pair", "cancel").catch(() => {});
+});
+
+newCode();
+listDevices();
+setInterval(listDevices, 30000);
+</script>
+</body>
+</html>

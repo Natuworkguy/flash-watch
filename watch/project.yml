@@ -1,0 +1,40 @@
+name: FlashWatch
+options:
+  deploymentTarget:
+    watchOS: "10.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+# Your team and bundle ID live in Local.xcconfig, which git ignores.
+configFiles:
+  Debug: Signing.xcconfig
+  Release: Signing.xcconfig
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  # The watch app itself: it needs no iPhone app, only Flash running on
+  # a computer it can reach.
+  FlashWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: FlashWatch
+    settings:
+      base:
+        PRODUCT_NAME: Flash
+        PRODUCT_BUNDLE_IDENTIFIER: $(FLASH_BUNDLE_ID).watchkitapp
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: "YES"
+    info:
+      path: FlashWatch/Info.plist
+      properties:
+        CFBundleDisplayName: Flash
+        WKApplication: true
+        WKWatchOnly: true
+        NSLocalNetworkUsageDescription: Flash talks to Flash on your own computer, over your Wi-Fi.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+    scheme: {}

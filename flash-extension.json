@@ -1,0 +1,11 @@
+{
+  "name": "watch",
+  "description": "Pair an Apple Watch with Flash: talk to your chats, your sparks and their team chats from your wrist.",
+  "version": "1.0.0",
+  "ui": {
+    "web": "extension",
+    "panels": [
+      {"id": "watch", "label": "Watch", "icon": "clock", "file": "watch.html"}
+    ]
+  }
+}

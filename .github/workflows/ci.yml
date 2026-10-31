@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  watch:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: scripts/watch.sh
+      - name: Screenshots on the smallest and largest watches
+        run: scripts/watch.sh screens
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screens
+          path: watch/build/screens
+
+  extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The manifest reads
+        run: python3 -c "import json; m = json.load(open('flash-extension.json')); assert m['name'] == 'watch'"
+      - name: The panel's script parses
+        run: |
+          sed -n '/<script>/,/<\/script>/p' extension/watch.html | sed '1d;$d' > /tmp/panel.js
+          node --check /tmp/panel.js

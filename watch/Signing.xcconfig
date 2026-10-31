@@ -1,0 +1,10 @@
+// Signing. Your own team and bundle ID go in Local.xcconfig, next to
+// this file. Git ignores it, so they never reach the repo:
+//
+//   DEVELOPMENT_TEAM = ABCDE12345
+//   FLASH_BUNDLE_ID = com.yourname.flash
+//
+// Without it, Xcode asks you to pick a team in Signing & Capabilities.
+
+FLASH_BUNDLE_ID = com.example.flash
+#include? "Local.xcconfig"

@@ -60,11 +60,10 @@ the app on your watch.
    scripts/watch.sh install
    ```
 
-4. **Pair.** Open **Watch** in Flash's sidebar. It shows a pairing code,
-   such as `1.20 · 482 019`: your computer's address on the Wi-Fi, then six
-   digits. Open Flash on the watch and type it. The code works once, for
-   five minutes. With the extension installed, Flash is on your network
-   whenever it starts, so there is nothing to turn on.
+4. **Pair.** Open **Watch** in Flash's sidebar. It shows an address and a
+   six digit code. Open Flash on the watch and type both. The code works
+   once, for five minutes. With the extension installed, Flash is on your
+   network whenever it starts, so there is nothing to turn on.
 
 To try it in the simulator instead: `scripts/watch.sh sim`. A simulator
 pairs as "(Simulator)", and any watch can be renamed under **Watch** in

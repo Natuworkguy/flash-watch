@@ -1,21 +1,13 @@
 import SwiftUI
 
-/// Pairing: the code Flash shows under Watch on the computer. It carries the
-/// computer's address on the Wi-Fi, so it is all there is to type; an address
-/// is asked for only away from it, for the public link.
+/// Pairing: the address Flash shows under Watch on the computer, and the
+/// six digits beside it.
 struct PairView: View {
     @EnvironmentObject private var flash: Flash
-    @State private var code = ""
     @State private var address = ""
-    @State private var other = false
+    @State private var code = ""
     @State private var working = false
     @State private var problem: String?
-
-    private var parsed: (address: String?, code: String?) { FlashClient.pairingCode(code) }
-
-    private var ready: Bool {
-        parsed.code != nil && (parsed.address != nil || !address.isEmpty)
-    }
 
     var body: some View {
         ScrollView {
@@ -30,20 +22,11 @@ struct PairView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                TextField("Pairing code", text: $code)
+                TextField("Address", text: $address)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 
-                if other || (parsed.code != nil && parsed.address == nil) {
-                    TextField("Address", text: $address)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                } else {
-                    Button("Use another address") { other = true }
-                        .font(.footnote)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
-                }
+                TextField("Code", text: $code)
 
                 Button {
                     Task { await pair() }
@@ -56,7 +39,7 @@ struct PairView: View {
                     }
                 }
                 .tint(.accentColor)
-                .disabled(working || !ready)
+                .disabled(working || address.isEmpty || code.filter(\.isNumber).count != 6)
 
                 if let problem {
                     Text(problem)
@@ -67,9 +50,7 @@ struct PairView: View {
         }
         .navigationTitle("Flash")
         .onAppear {
-            if address.isEmpty, !flash.lastAddress.isEmpty, !FlashClient.isLocal(flash.lastAddress) {
-                address = flash.lastAddress
-            }
+            if address.isEmpty { address = flash.lastAddress }
         }
     }
 
@@ -77,12 +58,8 @@ struct PairView: View {
         working = true
         problem = nil
         defer { working = false }
-        guard let secret = parsed.code else { return }
-        // An address typed in wins: it is there because the code's one
-        // could not be reached.
-        let where_ = address.isEmpty ? (parsed.address ?? "") : address
         do {
-            try await flash.pair(address: where_, code: secret)
+            try await flash.pair(address: address, code: code)
         } catch {
             problem = error.localizedDescription
             code = ""

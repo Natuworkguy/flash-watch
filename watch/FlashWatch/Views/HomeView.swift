@@ -8,6 +8,10 @@ struct HomeView: View {
     @State private var path = NavigationPath()
     @State private var starting = false
     @State private var problem: String?
+    @ObservedObject private var notes = NoteDelegate.shared
+
+    /// The chat on screen, whose replies need no notification.
+    private var openChat: String { flash.onScreen }
 
     /// How many chats the first screen shows before "All chats".
     private let recent = 6
@@ -39,6 +43,9 @@ struct HomeView: View {
                 }
 
                 Section {
+                    NavigationLink(value: Route.briefing) {
+                        Row(title: "Briefing", icon: "newspaper")
+                    }
                     NavigationLink(value: Route.sparks) {
                         Row(title: "Sparks", icon: "sparkles",
                             count: flash.sparks.filter(\.needsYou).count,
@@ -87,15 +94,25 @@ struct HomeView: View {
                 case .spark(let id): SparkView(id: id)
                 case .teams: TeamsView()
                 case .team(let id): TeamChatView(id: id)
+                case .briefing: BriefingView()
                 case .settings: SettingsView()
                 }
             }
         }
         // Kept fresh while the watch shows it.
+        // A tapped notification opens its chat.
+        .onChange(of: notes.opened) {
+            if let chat = notes.opened {
+                notes.opened = nil
+                path.append(Route.chat(chat))
+            }
+        }
+        .onAppear { Notes.ask() }
         .task(id: phase) {
             guard phase == .active else { return }
             while !Task.isCancelled {
                 await flash.refresh()
+                await Notes.check(flash, quiet: openChat)
                 try? await Task.sleep(for: .seconds(5))
             }
         }

@@ -14,6 +14,8 @@ final class Flash: ObservableObject {
     @Published var problem: String?
     /// Said on the pairing screen when the computer signed this watch out.
     @Published var signedOutNote: String?
+    /// The chat open on the watch now: its replies need no notification.
+    var onScreen = ""
 
     init() {
         if let address = Keychain.read("address"), let key = Keychain.read("key"),
@@ -82,6 +84,10 @@ final class Flash: ObservableObject {
                 if address != self.pairing?.address, var now = self.pairing {
                     now.address = address
                     save(now)
+                    // The one tried first did not answer: Flash, through the
+                    // one that did, says where it is now. Its Wi-Fi address
+                    // may simply have changed.
+                    if !syncing { Task { await syncAddresses(force: true) } }
                 }
                 return result
             } catch LinkError.unreachable(let host) {
@@ -98,6 +104,7 @@ final class Flash: ObservableObject {
     // Addresses ------------------------------------------------------
 
     private var syncedAt = Date.distantPast
+    private var syncing = false
 
     /// The public link, while the computer has one on.
     var publicAddress: String? { pairing?.addresses.first { !FlashClient.isLocal($0) } }
@@ -106,14 +113,24 @@ final class Flash: ObservableObject {
     /// one each time the tunnel starts) never has to be typed. Addresses
     /// on the Wi-Fi stay, even while the computer is off it; a public
     /// link that ended goes.
+    ///
+    /// Never a problem to show: away from home the Wi-Fi address cannot
+    /// answer, and that is as it should be.
     func syncAddresses(force: Bool = false) async {
-        guard pairing != nil, force || Date().timeIntervalSince(syncedAt) > 60 else { return }
+        guard pairing != nil, !syncing, force || Date().timeIntervalSince(syncedAt) > 60 else { return }
+        syncing = true
+        defer { syncing = false }
         syncedAt = Date()
         guard let told = try? await run({ try await $0.command("addresses") }),
               var now = pairing else { return }
         let found = told["addresses"].array.map(\.string).filter { !$0.isEmpty }
+        // Where Flash says it is on the Wi-Fi now replaces where it was: an
+        // address that changed is put right. Only when it says none (its
+        // network access is off for now) are the ones known kept.
+        let saysLocal = found.contains(where: FlashClient.isLocal)
+        let kept = saysLocal ? [] : now.addresses.filter(FlashClient.isLocal)
         var all: [String] = []
-        for address in found + now.addresses.filter(FlashClient.isLocal) where !all.contains(address) {
+        for address in found + kept where !all.contains(address) {
             all.append(address)
         }
         // Wi-Fi first: at home it is the quicker way.
@@ -178,6 +195,10 @@ final class Flash: ObservableObject {
             teams = roster["teams"].array.map(Team.init)
             problem = nil
             loaded = true
+        } catch LinkError.unreachable {
+            // Out of the house, or the computer asleep: nothing to fix,
+            // so nothing alarming. What it said last stays on screen.
+            if pairing != nil { problem = "Can't reach your computer right now." }
         } catch {
             if pairing != nil { problem = error.localizedDescription }
         }
@@ -252,6 +273,23 @@ final class Flash: ObservableObject {
         try await run {
             try await $0.command("team-chat-react", arg: team, ["id": entry, "emoji": emoji])
         }
+    }
+
+    // Notes and the briefing ------------------------------------------
+
+    /// What Flash had to tell since note SINCE: replies, questions, its
+    /// notifications, mentions.
+    func notifications(since: Int) async throws -> JSON {
+        try await run { try await $0.command("notifications", arg: String(since)) }
+    }
+
+    /// The briefing's cards, newest first, as the page shows them.
+    func briefing() async throws -> [JSON] {
+        try await run { try await $0.command("briefing", arg: "open") }["cards"].array
+    }
+
+    func dismissCard(_ id: String) async throws {
+        try await run { try await $0.command("briefing-dismiss", arg: id) }
     }
 
     // Voice ----------------------------------------------------------

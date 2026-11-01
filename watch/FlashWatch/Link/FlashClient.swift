@@ -110,6 +110,40 @@ struct FlashClient {
     }
 
     /// The six digits in what was typed or dictated.
+    /// The pairing code as Flash shows it, "1.20 · 482 019": the address on
+    /// the Wi-Fi, then six digits. The address part is the end of a home
+    /// network's 192.168 address, or a whole one, with a port when it is not
+    /// Flash's own. Either part is nil when it is not there.
+    static func pairingCode(_ typed: String) -> (address: String?, code: String?) {
+        let parts = typed.split { " ·-_,".contains($0) }.map(String.init)
+        var address: String?
+        var digits = ""
+        for part in parts {
+            if part.contains(".") || part.contains(":") {
+                address = networkAddress(part)
+            } else {
+                digits += part.filter { $0.isASCII && $0.isNumber }
+            }
+        }
+        return (address, digits.count == 6 ? digits : nil)
+    }
+
+    /// "1.20" is 192.168.1.20, "10.0.0.5" is itself; ":8000" after either
+    /// is the port. As http on Flash's port when none is given.
+    static func networkAddress(_ part: String) -> String? {
+        let pieces = part.split(separator: ":", maxSplits: 1).map(String.init)
+        let numbers = pieces[0].split(separator: ".").map(String.init)
+        guard numbers.allSatisfy({ UInt8($0) != nil }) else { return nil }
+        let host: String
+        switch numbers.count {
+        case 2: host = "192.168." + numbers.joined(separator: ".")
+        case 4: host = numbers.joined(separator: ".")
+        default: return nil
+        }
+        let port = pieces.count > 1 ? (Int(pieces[1]) ?? defaultPort) : defaultPort
+        return "http://\(host):\(port)"
+    }
+
     static func code(_ typed: String) throws -> String {
         let digits = typed.filter { $0.isASCII && $0.isNumber }
         guard digits.count == 6 else { throw LinkError.badCode }

@@ -27,7 +27,7 @@
   .step { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: start; }
   .step::before { counter-increment: step; content: counter(step); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; background: var(--hover); color: var(--text-2); border: 1px solid var(--border); }
   .step b { color: var(--text); font-weight: 600; }
-  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .pair { display: grid; grid-template-columns: 1fr; gap: 1px; background: var(--border); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
   .pair > div { background: var(--surface); padding: 18px 20px; min-width: 0; }
   .label { font-size: 12px; color: var(--text-3); margin-bottom: 6px; }
   .code { font: 500 34px/1.1 var(--mono); letter-spacing: 0.06em; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -78,13 +78,13 @@
   <div id="pairing">
     <div class="pair">
       <div>
-        <div class="label">Address</div>
-        <div id="addresses"></div>
-      </div>
-      <div>
-        <div class="label">Code</div>
+        <div class="label">Pairing code</div>
         <div class="code" id="code">······</div>
         <div class="meta"><span id="left"></span><button type="button" class="link" id="again">New code</button></div>
+      </div>
+      <div>
+        <div class="label">Flash is at</div>
+        <div id="addresses"></div>
       </div>
     </div>
   </div>
@@ -92,7 +92,7 @@
   <h2>How to pair</h2>
   <div class="card steps">
     <div class="step"><span>Put <b>Flash</b> on your watch. See <a href="https://github.com/Natuworkguy/flash-watch#readme" target="_blank" rel="noopener">the guide</a>.</span></div>
-    <div class="step"><span>Open it, and type the <b>address</b> and the <b>code</b> above.</span></div>
+    <div class="step"><span id="how">Open it, and type the <b>pairing code</b>. It has this computer's address in it.</span></div>
     <div class="step"><span>That's it. The code works once, for five minutes.</span></div>
   </div>
 
@@ -130,11 +130,27 @@ async function newCode() {
   let made;
   try { made = await Flash.request("device-pair"); } catch (error) { Flash.toast(error.message || "Couldn't make a code"); return; }
   drawAddresses(made.addresses || []);
-  $("#code").textContent = `${made.code.slice(0, 3)} ${made.code.slice(3)}`;
+  // The address on the Wi-Fi goes in the code, so the watch needs only
+  // the one thing typed: "1.20 482 019" is 192.168.1.20, on Flash's port.
+  const home = (made.addresses || []).find((a) => a.startsWith("http:"));
+  const where = home ? inCode(home) : "";
+  $("#code").textContent = `${where ? where + " · " : ""}${made.code.slice(0, 3)} ${made.code.slice(3)}`;
+  $("#how").innerHTML = where
+    ? "Open it, and type the <b>pairing code</b>. It has this computer's address in it."
+    : "Open it, and type the <b>address</b> and the <b>pairing code</b>.";
   $("#code").classList.remove("gone");
   expires = made.expires * 1000;
   used = false;
   tick();
+}
+
+// The Wi-Fi address as the code carries it: the end of a home network's
+// 192.168 address, or the whole of any other; the port only when it is
+// not Flash's own.
+function inCode(address) {
+  const url = new URL(address);
+  const host = url.hostname.startsWith("192.168.") ? url.hostname.slice(8) : url.hostname;
+  return url.port && url.port !== DEFAULT_PORT ? `${host}:${url.port}` : host;
 }
 
 function drawAddresses(addresses) {

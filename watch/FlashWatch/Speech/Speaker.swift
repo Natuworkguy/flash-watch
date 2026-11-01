@@ -9,6 +9,10 @@ enum Prefs {
     static let flashVoice = "flashVoice"
     /// Messages sent as spoken, so replies come back short.
     static let shortReplies = "shortReplies"
+    /// A notification when a reply comes in.
+    static let notifyReplies = "notifyReplies"
+    /// A notification for Flash's own, its questions, and sparks' mentions.
+    static let notifyFlash = "notifyFlash"
 }
 
 /// Reads replies aloud: in Flash's own voice when the computer has one

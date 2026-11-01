@@ -115,7 +115,11 @@ struct ChatView: View {
         .navigationTitle(chat?.item.shownTitle ?? "Chat")
         .navigationBarTitleDisplayMode(.inline)
         .task { await follow() }
-        .onDisappear { speaker.stop() }
+        .onAppear { flash.onScreen = id }
+        .onDisappear {
+            speaker.stop()
+            if flash.onScreen == id { flash.onScreen = "" }
+        }
     }
 
     private var composer: some View {

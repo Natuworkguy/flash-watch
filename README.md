@@ -21,6 +21,11 @@ your own computer. Nothing goes anywhere else.
 - **Read aloud.** Any reply, read out in Flash's own voice when your
   computer has one, or the watch's. New replies can be read out as they
   arrive.
+- **Notifications** for replies, for questions Flash is waiting on, for
+  Flash's own notifications and for a spark mentioning you. While the app
+  is open they come at once; closed, watchOS lets it check a few times an
+  hour. Tap one to open its chat.
+- **The briefing**: each card to read, hear or put away.
 - **A tap on the wrist** when Flash finishes a reply or a spark posts in
   the chat you have open.
 
@@ -55,9 +60,11 @@ the app on your watch.
    scripts/watch.sh install
    ```
 
-4. **Pair.** Open **Watch** in Flash's sidebar. It shows an address and a
-   six digit code. Open Flash on the watch and type both. The code works
-   once, for five minutes.
+4. **Pair.** Open **Watch** in Flash's sidebar. It shows a pairing code,
+   such as `1.20 · 482 019`: your computer's address on the Wi-Fi, then six
+   digits. Open Flash on the watch and type it. The code works once, for
+   five minutes. With the extension installed, Flash is on your network
+   whenever it starts, so there is nothing to turn on.
 
 To try it in the simulator instead: `scripts/watch.sh sim`. A simulator
 pairs as "(Simulator)", and any watch can be renamed under **Watch** in
@@ -80,7 +87,11 @@ forgets the key there.
 On your Wi-Fi the watch talks to Flash over plain HTTP, like a phone on
 the same network does. The public link is HTTPS. A tunnel gets a new
 address each time it starts; the watch asks Flash for the current one
-every minute, so it keeps up by itself.
+every minute, so it keeps up by itself. When the Wi-Fi address stops
+answering, the watch asks Flash through the public link where it is now,
+and if your computer's address changed, it takes the new one. Away from
+home there is nothing to fix, so it only says it cannot reach your
+computer.
 
 ## Layout
 

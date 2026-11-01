@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 @main
 struct FlashWatchApp: App {
@@ -10,7 +11,10 @@ struct FlashWatchApp: App {
             Prefs.readAloud: false,
             Prefs.flashVoice: true,
             Prefs.shortReplies: true,
+            Prefs.notifyReplies: true,
+            Prefs.notifyFlash: true,
         ])
+        UNUserNotificationCenter.current().delegate = NoteDelegate.shared
     }
 
     var body: some Scene {
@@ -19,18 +23,31 @@ struct FlashWatchApp: App {
                 .environmentObject(flash)
                 .environmentObject(speaker)
         }
+        // With the app closed, watchOS wakes it now and then: what Flash
+        // had to say since shows as notifications.
+        .backgroundTask(.appRefresh(Notes.refreshID)) {
+            let flash = await Flash()
+            await Notes.check(flash)
+            await Notes.schedule()
+        }
     }
 }
 
 /// Pairing until there is a computer to talk to, then Flash.
 struct RootView: View {
     @EnvironmentObject private var flash: Flash
+    @Environment(\.scenePhase) private var phase
 
     var body: some View {
-        if flash.pairing == nil {
-            NavigationStack { PairView() }
-        } else {
-            HomeView()
+        Group {
+            if flash.pairing == nil {
+                NavigationStack { PairView() }
+            } else {
+                HomeView()
+            }
+        }
+        .onChange(of: phase) {
+            if phase == .background, flash.pairing != nil { Notes.schedule() }
         }
     }
 }
@@ -43,5 +60,6 @@ enum Route: Hashable {
     case teams
     case team(String)
     case chats
+    case briefing
     case settings
 }

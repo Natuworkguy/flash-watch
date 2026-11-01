@@ -7,6 +7,8 @@ struct SettingsView: View {
     @AppStorage(Prefs.readAloud) private var readAloud = false
     @AppStorage(Prefs.flashVoice) private var flashVoice = true
     @AppStorage(Prefs.shortReplies) private var shortReplies = true
+    @AppStorage(Prefs.notifyReplies) private var notifyReplies = true
+    @AppStorage(Prefs.notifyFlash) private var notifyFlash = true
     @State private var confirming = false
     @State private var opening = false
     @State private var problem: String?
@@ -65,6 +67,15 @@ struct SettingsView: View {
                 Text(flash.publicAddress == nil
                      ? "Turns on your computer's tunnel, so the watch reaches Flash away from your Wi-Fi too. It can take a minute."
                      : "The watch uses whichever one answers.")
+            }
+
+            Section {
+                Toggle("Replies", isOn: $notifyReplies)
+                Toggle("Questions and Flash's notifications", isOn: $notifyFlash)
+            } header: {
+                Text("Notify me")
+            } footer: {
+                Text("While Flash is open on the watch, at once. Closed, watchOS checks a few times an hour.")
             }
 
             Section("Replies") {

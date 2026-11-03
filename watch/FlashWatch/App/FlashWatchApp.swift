@@ -49,7 +49,10 @@ struct RootView: View {
         }
         .onChange(of: phase) {
             if phase == .background, flash.pairing != nil { Notes.schedule() }
-            if phase == .active, flash.pairing != nil { Locator.shared.update(flash) }
+            if phase == .active, flash.pairing != nil {
+                Locator.shared.update(flash)
+                Battery.report(flash)
+            }
         }
     }
 }

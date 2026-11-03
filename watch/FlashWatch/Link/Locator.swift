@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import WatchKit
 
 /// Where the watch is, told to Flash only while "Let Flash see my
 /// location" is on. Off, nothing is asked of Core Location and Flash is
@@ -84,6 +85,26 @@ final class Locator: NSObject, ObservableObject, CLLocationManagerDelegate {
                                      didFailWithError error: Error) {
         Task { @MainActor in
             self.problem = "The watch couldn't find where it is just now."
+        }
+    }
+}
+
+/// The watch's battery, told to Flash when it is opened, for Flash's
+/// devices tool. Nothing else about the watch is sent.
+@MainActor
+enum Battery {
+    static func report(_ flash: Flash) {
+        let device = WKInterfaceDevice.current()
+        device.isBatteryMonitoringEnabled = true
+        let level = device.batteryLevel
+        guard level >= 0 else { return }
+        let charging = device.batteryState == .charging || device.batteryState == .full
+        Task {
+            _ = try? await flash.run {
+                try await $0.command("device", ["battery": Double(level),
+                                                "charging": charging,
+                                                "watch": device.name])
+            }
         }
     }
 }

@@ -13,6 +13,8 @@ enum Prefs {
     static let notifyReplies = "notifyReplies"
     /// A notification for Flash's own, its questions, and sparks' mentions.
     static let notifyFlash = "notifyFlash"
+    /// The watch's location, told to Flash. Off unless turned on.
+    static let shareLocation = "shareLocation"
 }
 
 /// Reads replies aloud: in Flash's own voice when the computer has one

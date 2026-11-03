@@ -5,7 +5,10 @@ import WatchKit
 /// the chats, the sparks and their teams, and everything it can ask.
 @MainActor
 final class Flash: ObservableObject {
+    /// The computer the watch talks to now: one of SERVERS.
     @Published private(set) var pairing: Pairing?
+    /// Every computer this watch is paired with.
+    @Published private(set) var servers: [Pairing] = []
     @Published private(set) var chats: [ChatItem] = []
     @Published private(set) var sparks: [Spark] = []
     @Published private(set) var teams: [Team] = []
@@ -18,11 +21,20 @@ final class Flash: ObservableObject {
     var onScreen = ""
 
     init() {
-        if let address = Keychain.read("address"), let key = Keychain.read("key"),
-           !address.isEmpty, !key.isEmpty {
+        if let kept = Keychain.read("servers"),
+           let found = try? JSONDecoder().decode([Pairing].self, from: Data(kept.utf8)) {
+            servers = found
+        } else if let address = Keychain.read("address"), let key = Keychain.read("key"),
+                  !address.isEmpty, !key.isEmpty {
+            // Paired before a watch could have several: that one, kept.
             let all = (Keychain.read("addresses") ?? "").split(separator: "\n").map(String.init)
-            pairing = Pairing(address: address, addresses: all.isEmpty ? [address] : all, key: key)
+            servers = [Pairing(address: address, addresses: all.isEmpty ? [address] : all, key: key)]
+            keep()
+            Keychain.write(nil, for: "key")
+            Keychain.write(nil, for: "addresses")
         }
+        let current = Keychain.read("current")
+        pairing = servers.first { $0.id == current } ?? servers.first
     }
 
     // Pairing --------------------------------------------------------
@@ -32,11 +44,32 @@ final class Flash: ObservableObject {
         let code = try FlashClient.code(typedCode)
         let key = try await FlashClient(base: address)
             .pair(code: code, name: Self.deviceName)
-        Keychain.write(key, for: "key")
         signedOutNote = nil
-        save(Pairing(address: address, addresses: [address], key: key))
+        // Paired again with one it knew: that one, with its new key.
+        var found = servers.first { $0.addresses.contains(address) }
+            ?? Pairing(address: address, addresses: [address], key: key)
+        found.address = address
+        found.key = key
+        save(found)
+        use(found.id)
         await syncAddresses(force: true)
         await refresh()
+    }
+
+    /// Talks to the computer ID from now on.
+    func use(_ id: String) {
+        guard let found = servers.first(where: { $0.id == id }) else { return }
+        if found.id != pairing?.id {
+            clear()
+            syncedAt = .distantPast
+        }
+        pairing = found
+        Keychain.write(found.id, for: "current")
+    }
+
+    /// What the watch calls a computer: where it is reached.
+    static func label(_ server: Pairing) -> String {
+        FlashClient.hostOf(server.addresses.first(where: FlashClient.isLocal) ?? server.address)
     }
 
     /// What the computer lists this watch as, until it is renamed there:
@@ -50,15 +83,26 @@ final class Flash: ObservableObject {
         #endif
     }
 
-    func unpair(note: String? = nil) {
-        Keychain.write(nil, for: "key")
+    /// Forgets the computer in use (or ID), and talks to the next one
+    /// paired, if there is one.
+    func unpair(_ id: String? = nil, note: String? = nil) {
+        guard let gone = id ?? pairing?.id else { return }
+        servers.removeAll { $0.id == gone }
+        keep()
+        Notes.forget(gone)
+        guard gone == pairing?.id else { return }
+        clear()
         pairing = nil
+        signedOutNote = note
+        if let next = servers.first { use(next.id) } else { Keychain.write(nil, for: "current") }
+    }
+
+    private func clear() {
         chats = []
         sparks = []
         teams = []
         loaded = false
         problem = nil
-        signedOutNote = note
     }
 
     /// The address it was paired with, to offer again when pairing anew.
@@ -66,8 +110,19 @@ final class Flash: ObservableObject {
 
     private func save(_ found: Pairing) {
         Keychain.write(found.address, for: "address")
-        Keychain.write(found.addresses.joined(separator: "\n"), for: "addresses")
-        pairing = found
+        if let at = servers.firstIndex(where: { $0.id == found.id }) {
+            servers[at] = found
+        } else {
+            servers.append(found)
+        }
+        keep()
+        // A request that ends after a switch updates its own computer only.
+        if found.id == pairing?.id { pairing = found }
+    }
+
+    private func keep() {
+        let data = (try? JSONEncoder().encode(servers)) ?? Data()
+        Keychain.write(servers.isEmpty ? nil : String(decoding: data, as: UTF8.self), for: "servers")
     }
 
     /// Runs WORK against the address that answered last, then the others:
@@ -81,7 +136,7 @@ final class Flash: ObservableObject {
         for address in order {
             do {
                 let result = try await work(FlashClient(base: address, key: pairing.key))
-                if address != self.pairing?.address, var now = self.pairing {
+                if address != self.pairing?.address, var now = self.pairing, now.id == pairing.id {
                     now.address = address
                     save(now)
                     // The one tried first did not answer: Flash, through the
@@ -94,7 +149,7 @@ final class Flash: ObservableObject {
                 failed = LinkError.unreachable(order.count > 1 ? "any of its addresses" : host)
                 continue
             } catch LinkError.signedOut {
-                unpair(note: LinkError.signedOut.errorDescription)
+                unpair(pairing.id, note: LinkError.signedOut.errorDescription)
                 throw LinkError.signedOut
             }
         }
@@ -121,8 +176,9 @@ final class Flash: ObservableObject {
         syncing = true
         defer { syncing = false }
         syncedAt = Date()
+        let asked = pairing?.id
         guard let told = try? await run({ try await $0.command("addresses") }),
-              var now = pairing else { return }
+              var now = pairing, now.id == asked else { return }
         let found = told["addresses"].array.map(\.string).filter { !$0.isEmpty }
         // Where Flash says it is on the Wi-Fi now replaces where it was: an
         // address that changed is put right. Only when it says none (its
@@ -143,7 +199,7 @@ final class Flash: ObservableObject {
         // Back home on the public link: the Wi-Fi again, once it answers.
         if !FlashClient.isLocal(now.address), let home = all.first(where: FlashClient.isLocal),
            (try? await FlashClient(base: home, key: now.key, timeout: 3).get("/api/state?lite=1")) != nil,
-           var back = pairing {
+           var back = pairing, back.id == now.id {
             back.address = home
             save(back)
         }
@@ -175,7 +231,7 @@ final class Flash: ObservableObject {
     // The lists ------------------------------------------------------
 
     func refresh() async {
-        guard pairing != nil else { return }
+        guard let asked = pairing?.id else { return }
         await syncAddresses()
         do {
             let state = try await run { try await $0.get("/api/state?lite=1") }
@@ -183,6 +239,8 @@ final class Flash: ObservableObject {
             let teamOf = Dictionary(
                 roster["sparks"].array.map { ($0["id"].string, $0["team"].string) },
                 uniquingKeysWith: { first, _ in first })
+            // Switched to another computer meanwhile: these are not its.
+            guard pairing?.id == asked else { return }
 
             chats = state["chats"].array.map(ChatItem.init)
                 .filter { !$0.id.isEmpty }

@@ -10,8 +10,8 @@ import WatchKit
 /// with it closed, when watchOS wakes it to refresh, a few times an hour.
 @MainActor
 enum Notes {
-    /// The last of Flash's notes the watch has seen.
-    private static let seenKey = "notesSeen"
+    /// The last of Flash's notes the watch has seen, on each computer.
+    private static func seenKey(_ server: String) -> String { "notesSeen.\(server)" }
     static let refreshID = "flash.notes"
     /// How often to ask watchOS for a background refresh. It decides when.
     private static let every: TimeInterval = 15 * 60
@@ -24,14 +24,16 @@ enum Notes {
     /// whose replies need no notification. How many it showed.
     @discardableResult
     static func check(_ flash: Flash, quiet: String = "") async -> Int {
+        guard let server = flash.pairing?.id else { return 0 }
+        let key = seenKey(server)
         let defaults = UserDefaults.standard
-        let firstTime = defaults.object(forKey: seenKey) == nil
-        let seen = defaults.integer(forKey: seenKey)
+        let firstTime = defaults.object(forKey: key) == nil
+        let seen = defaults.integer(forKey: key)
         guard let got = try? await flash.notifications(since: seen) else { return 0 }
         let last = got["last"].int
         // Flash started again since: its notes count from the start.
         let since = last < seen ? 0 : seen
-        defaults.set(last, forKey: seenKey)
+        defaults.set(last, forKey: key)
         // Paired just now: what came before is old news.
         guard !firstTime else { return 0 }
 
@@ -47,6 +49,11 @@ enum Notes {
             shown += 1
         }
         return shown
+    }
+
+    /// A computer unpaired: its count goes with it.
+    static func forget(_ server: String) {
+        UserDefaults.standard.removeObject(forKey: seenKey(server))
     }
 
     private static func post(_ note: JSON) {

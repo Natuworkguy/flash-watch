@@ -4,6 +4,9 @@ import SwiftUI
 /// six digits beside it.
 struct PairView: View {
     @EnvironmentObject private var flash: Flash
+    @Environment(\.dismiss) private var dismiss
+    /// Pairing one more computer, from Settings, rather than the first.
+    var adding = false
     @State private var address = ""
     @State private var code = ""
     @State private var working = false
@@ -50,7 +53,7 @@ struct PairView: View {
         }
         .navigationTitle("Flash")
         .onAppear {
-            if address.isEmpty { address = flash.lastAddress }
+            if address.isEmpty && !adding { address = flash.lastAddress }
         }
     }
 
@@ -60,6 +63,7 @@ struct PairView: View {
         defer { working = false }
         do {
             try await flash.pair(address: address, code: code)
+            if adding { dismiss() }
         } catch {
             problem = error.localizedDescription
             code = ""

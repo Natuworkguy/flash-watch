@@ -24,8 +24,11 @@ enum LinkError: LocalizedError, Equatable {
     }
 }
 
-/// The computer running Flash, and this watch's key to it.
-struct Pairing: Equatable {
+/// A computer running Flash, and this watch's key to it. A watch can be
+/// paired with several; it talks to one at a time.
+struct Pairing: Equatable, Codable, Identifiable {
+    /// Its own, so it stays the same one when its addresses change.
+    var id = UUID().uuidString
     /// The address that answered last: tried first.
     var address: String
     /// Every address Flash is known at: on the Wi-Fi, and its public link.

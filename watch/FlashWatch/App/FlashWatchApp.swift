@@ -13,6 +13,7 @@ struct FlashWatchApp: App {
             Prefs.shortReplies: true,
             Prefs.notifyReplies: true,
             Prefs.notifyFlash: true,
+            Prefs.shareLocation: false,
         ])
         UNUserNotificationCenter.current().delegate = NoteDelegate.shared
     }
@@ -48,6 +49,7 @@ struct RootView: View {
         }
         .onChange(of: phase) {
             if phase == .background, flash.pairing != nil { Notes.schedule() }
+            if phase == .active, flash.pairing != nil { Locator.shared.update(flash) }
         }
     }
 }

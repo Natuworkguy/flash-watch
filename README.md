@@ -75,13 +75,20 @@ Flash.
    watch uses whichever one answers, and goes back to the Wi-Fi when you
    are home. The same button is under **Watch** in Flash.
 
+6. **More than one computer.** A watch can be paired with several
+   computers running Flash. In the watch's Settings, tap **Pair another
+   computer** and type that computer's address and code. Each one is
+   listed under **Computers**; the watch talks to the one with a check,
+   and a tap switches to another. Notifications come from the one in use.
+
 ## How it works
 
 The watch signs in to Flash like another browser would, with a key of its
 own. The code is how it gets that key: it ends when it is used, after five
 minutes, or after five wrong tries. Each paired watch is listed under
 **Watch** in Flash, where it can be signed out. Unpairing on the watch
-forgets the key there.
+forgets the key to the computer in use, and moves on to the next one
+paired, if there is one.
 
 On your Wi-Fi the watch talks to Flash over plain HTTP, like a phone on
 the same network does. The public link is HTTPS. A tunnel gets a new

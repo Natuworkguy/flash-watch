@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage(Prefs.shortReplies) private var shortReplies = true
     @AppStorage(Prefs.notifyReplies) private var notifyReplies = true
     @AppStorage(Prefs.notifyFlash) private var notifyFlash = true
+    @AppStorage(Prefs.shareLocation) private var shareLocation = false
+    @ObservedObject private var locator = Locator.shared
     @State private var confirming = false
     @State private var opening = false
     @State private var problem: String?
@@ -70,6 +72,41 @@ struct SettingsView: View {
             }
 
             Section {
+                ForEach(flash.servers) { server in
+                    Button {
+                        flash.use(server.id)
+                        Task { await flash.refresh() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "desktopcomputer")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 18)
+                            Text(Flash.label(server))
+                                .font(.footnote)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                            Spacer(minLength: 0)
+                            if server.id == flash.pairing?.id {
+                                Image(systemName: "checkmark")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.accentColor)
+                                    .accessibilityLabel("In use")
+                            }
+                        }
+                    }
+                }
+                NavigationLink {
+                    PairView(adding: true)
+                } label: {
+                    Label("Pair another computer", systemImage: "plus")
+                }
+            } header: {
+                Text("Computers")
+            } footer: {
+                Text("The watch talks to the one with a check. Tap another to switch.")
+            }
+
+            Section {
                 Toggle("Replies", isOn: $notifyReplies)
                 Toggle("Questions and Flash's notifications", isOn: $notifyFlash)
             } header: {
@@ -85,19 +122,39 @@ struct SettingsView: View {
             }
 
             Section {
-                Button("Unpair", role: .destructive) {
+                Toggle("Let Flash see my location", isOn: $shareLocation)
+                if shareLocation, let trouble = locator.problem {
+                    Text(trouble)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                Text("Location")
+            } footer: {
+                Text("On, the watch tells Flash where it is when you use it, so Flash can answer \"near me\". Off, it finds nothing and sends nothing, and Flash forgets the last place.")
+            }
+
+            Section {
+                Button("Unpair this computer", role: .destructive) {
                     confirming = true
                 }
             } footer: {
-                Text("To rename this watch or sign it out from the computer, use Watch in Flash's sidebar.")
+                Text("Unpairs only the computer in use. To rename this watch or sign it out from the computer, use Watch in Flash's sidebar.")
             }
         }
         .navigationTitle("Settings")
         .task { await flash.syncAddresses(force: true) }
-        .confirmationDialog("Unpair this watch?", isPresented: $confirming) {
+        .onChange(of: shareLocation) {
+            if shareLocation {
+                Locator.shared.update(flash, force: true)
+            } else {
+                Locator.shared.stop(flash)
+            }
+        }
+        .confirmationDialog("Unpair from \(flash.pairing.map(Flash.label) ?? "this computer")?", isPresented: $confirming) {
             Button("Unpair", role: .destructive) { flash.unpair() }
         } message: {
-            Text("You'll need a new code from your computer to pair again.")
+            Text("You'll need a new code from that computer to pair again.")
         }
     }
 

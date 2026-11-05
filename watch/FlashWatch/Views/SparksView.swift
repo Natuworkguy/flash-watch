@@ -65,6 +65,7 @@ struct Face: View {
 struct SparkView: View {
     let id: String
     @EnvironmentObject private var flash: Flash
+    @EnvironmentObject private var calls: Calls
     @State private var busy = false
     @State private var problem: String?
     @State private var opened: String?
@@ -116,6 +117,13 @@ struct SparkView: View {
                         Task { await talk(text) }
                     }
                     .listItemTint(spark.color)
+
+                    Button {
+                        Task { await calls.place(spark) }
+                    } label: {
+                        Label("Call \(spark.name)", systemImage: "phone.fill")
+                    }
+                    .disabled(calls.showing)
 
                     if !spark.team.isEmpty, let team = flash.team(spark.team) {
                         NavigationLink(value: Route.team(team.id)) {

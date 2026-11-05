@@ -333,6 +333,43 @@ final class Flash: ObservableObject {
         }
     }
 
+    // Calls ----------------------------------------------------------
+
+    /// Sparks' calls to you ringing now.
+    func rings() async throws -> [Ring] {
+        try await run { try await $0.command("team-chat-ringing") }["rings"].array
+            .map(Ring.init).filter { !$0.call.isEmpty }
+    }
+
+    /// A call to the spark or team TEAM: its id.
+    func startCall(_ team: String) async throws -> String {
+        let made = try await run { try await $0.command("team-chat-call", arg: team) }
+        return made["entry"]["call"].string
+    }
+
+    /// One step of a call: beat, connected, answer, decline, end or cancel.
+    /// The call as it stands after.
+    @discardableResult
+    func callStep(_ step: String, call: String, team: String) async throws -> JSON {
+        try await run {
+            try await $0.command("team-chat-call", arg: team, ["step": step, "call": call])
+        }["entry"]
+    }
+
+    /// TEXT said on the call CALL: the entry it made.
+    func sayOnCall(_ text: String, call: String, team: String, hidden: Bool = false) async throws -> Int {
+        let said = try await run {
+            try await $0.command("team-chat-say", arg: team,
+                                 ["text": text, "call": call, "hidden": hidden])
+        }
+        return said["entry"]["id"].int
+    }
+
+    /// A team chat read without marking it read: what a call listens to.
+    func peekTeamChat(_ team: String, since: Int) async throws -> JSON {
+        try await run { try await $0.command("team-chat", arg: team, ["since": since, "read": false]) }
+    }
+
     // Notes and the briefing ------------------------------------------
 
     /// What Flash had to tell since note SINCE: replies, questions, its
@@ -352,9 +389,12 @@ final class Flash: ObservableObject {
 
     // Voice ----------------------------------------------------------
 
-    /// TEXT in Flash's own voice, as a WAV, when the computer has one.
-    func voice(_ text: String) async throws -> Data {
-        let said = try await run { try await $0.post("/api/voice/say", ["text": text]) }
+    /// TEXT in Flash's own voice, as a WAV, when the computer has one:
+    /// in SPARK's own voice when a spark says it.
+    func voice(_ text: String, spark: String = "") async throws -> Data {
+        var body: [String: Any] = ["text": text]
+        if !spark.isEmpty { body["spark"] = spark }
+        let said = try await run { try await $0.post("/api/voice/say", body) }
         guard let audio = Data(base64Encoded: said["audio"].string), !audio.isEmpty else {
             throw LinkError.refused("No voice on the computer.")
         }

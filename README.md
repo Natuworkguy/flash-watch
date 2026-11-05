@@ -25,6 +25,13 @@ your own computer. Nothing goes anywhere else.
   Flash's own notifications and for a spark mentioning you. While the app
   is open they come at once; closed, watchOS lets it check a few times an
   hour. Tap one to open its chat.
+- **Calls.** When a spark calls you, the watch rings: taps on your wrist,
+  who is calling and why, and Answer or Decline. Picked up, the spark
+  speaks first, in its own voice when your computer has one, and you
+  talk back by dictation. Call any spark yourself from its page. While
+  the app is open it rings at once; closed, a call still ringing when
+  watchOS lets the app check comes as a notification with Answer and
+  Decline, and one that rang out as a missed call.
 - **The briefing**: each card to read, hear or put away.
 - **A tap on the wrist** when Flash finishes a reply or a spark posts in
   the chat you have open.

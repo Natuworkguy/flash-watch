@@ -43,7 +43,16 @@ final class Speaker: NSObject, ObservableObject {
         }
     }
 
-    func say(_ text: String, id: String, flash: Flash) {
+    /// TEXT read out as SAY does, returning once it has been said, or
+    /// stopped.
+    func sayAndWait(_ text: String, id: String, flash: Flash, spark: String = "") async {
+        say(text, id: id, flash: flash, spark: spark)
+        while speaking == id, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(150))
+        }
+    }
+
+    func say(_ text: String, id: String, flash: Flash, spark: String = "") {
         stop()
         let words = Self.speakable(text)
         guard !words.isEmpty else { return }
@@ -54,7 +63,7 @@ final class Speaker: NSObject, ObservableObject {
         let flashVoice = UserDefaults.standard.object(forKey: Prefs.flashVoice) as? Bool ?? true
         guard flashVoice else { return speakHere(words) }
         job = Task {
-            let audio = try? await flash.voice(words)
+            let audio = try? await flash.voice(words, spark: spark)
             guard !Task.isCancelled, speaking == id else { return }
             if let audio, let player = try? AVAudioPlayer(data: audio) {
                 self.player = player

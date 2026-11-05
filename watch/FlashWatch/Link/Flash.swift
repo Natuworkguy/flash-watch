@@ -341,9 +341,14 @@ final class Flash: ObservableObject {
             .map(Ring.init).filter { !$0.call.isEmpty }
     }
 
+    /// This watch, as the device a call is on: another can take it over.
+    static let callHolder = "watch:" + UUID().uuidString.prefix(8).lowercased()
+
     /// A call to the spark or team TEAM: its id.
     func startCall(_ team: String) async throws -> String {
-        let made = try await run { try await $0.command("team-chat-call", arg: team) }
+        let made = try await run {
+            try await $0.command("team-chat-call", arg: team, ["holder": Self.callHolder])
+        }
         return made["entry"]["call"].string
     }
 
@@ -352,7 +357,8 @@ final class Flash: ObservableObject {
     @discardableResult
     func callStep(_ step: String, call: String, team: String) async throws -> JSON {
         try await run {
-            try await $0.command("team-chat-call", arg: team, ["step": step, "call": call])
+            try await $0.command("team-chat-call", arg: team,
+                                 ["step": step, "call": call, "holder": Self.callHolder])
         }["entry"]
     }
 

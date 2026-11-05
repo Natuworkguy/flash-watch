@@ -270,10 +270,15 @@ final class Calls: ObservableObject {
                 // Hung up on the computer, or over there for long enough
                 // that Flash ended it: over here too.
                 if let entry = try? await flash.callStep("beat", call: on.call, team: on.team),
-                   !["ringing", "calling", "live", ""].contains(entry["state"].string),
                    call?.call == on.call {
-                    finish("Call ended.")
-                    return
+                    if !["ringing", "calling", "live", ""].contains(entry["state"].string) {
+                        finish("Call ended.")
+                        return
+                    }
+                    if movedAway(entry) {
+                        letGo()
+                        return
+                    }
                 }
             }
         }
@@ -303,6 +308,13 @@ final class Calls: ObservableObject {
             guard let chat = try? await flash.peekTeamChat(team, since: since) else { continue }
             let entries = chat["entries"].array
             for entry in entries { since = max(since, entry["id"].int) }
+            // Taken over by another Flash: it goes on there.
+            if chat["changed"].array.contains(where: {
+                $0["kind"].string == "call" && $0["call"].string == id && movedAway($0)
+            }) {
+                letGo()
+                return
+            }
             let answers = entries.filter {
                 $0["kind"].string == "spark" && $0["call"].string == id && $0["id"].int > mine
             }
@@ -344,6 +356,30 @@ final class Calls: ObservableObject {
             quiet = Date()
         }
         if !Task.isCancelled { set(.listening, on: id) }
+    }
+
+    /// Whether ENTRY, this call's, is now held by another Flash.
+    private func movedAway(_ entry: JSON) -> Bool {
+        let holder = entry["holder"].string
+        return !holder.isEmpty && holder != Flash.callHolder
+    }
+
+    /// The call was taken over by another Flash: it goes on there, so
+    /// the watch lets go without hanging up.
+    private func letGo() {
+        round?.cancel()
+        beat?.cancel()
+        Speaker.shared.stop()
+        guard call != nil else { return }
+        call?.status = .ended
+        call?.caption = "The call moved to another Flash."
+        call?.said = ""
+        WKInterfaceDevice.current().play(.directionDown)
+        let ended = call?.call
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            if self.call?.call == ended, self.call?.status == .ended { self.call = nil }
+        }
     }
 
     /// The first answer on a call placed from here: it is connected.

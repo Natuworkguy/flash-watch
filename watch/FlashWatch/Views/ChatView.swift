@@ -74,10 +74,12 @@ struct ChatView: View {
     @EnvironmentObject private var speaker: Speaker
     @AppStorage(Prefs.readAloud) private var readAloud = false
     @State private var chat: ChatDetail?
+    /// The chat's log as blocks: worked out once when it changes, not on
+    /// every redraw.
+    @State private var blocks: [Block] = []
     @State private var problem: String?
     @State private var sending = false
 
-    private var blocks: [Block] { Block.from(chat?.log ?? []) }
     private var busy: Bool { chat?.item.busy ?? false }
 
     var body: some View {
@@ -170,15 +172,19 @@ struct ChatView: View {
     private func load() async {
         do {
             let fresh = try await flash.chat(id)
+            if problem != nil { problem = nil }
+            // Nothing new since the last look: nothing to redraw.
+            guard fresh != chat else { return }
             let wasBusy = busy
-            let before = chat.map { Block.from($0.log).count } ?? -1
+            let before = chat == nil ? -1 : blocks.count
+            let freshBlocks = Block.from(fresh.log)
             chat = fresh
-            problem = nil
+            if freshBlocks != blocks { blocks = freshBlocks }
             // A turn just ended while you watched: a tap on the wrist,
             // and the reply read out if you asked for that.
             if wasBusy, !fresh.item.busy, before >= 0 {
                 WKInterfaceDevice.current().play(.notification)
-                if readAloud, case .reply(let n, let text)? = Block.from(fresh.log).last {
+                if readAloud, case .reply(let n, let text)? = freshBlocks.last {
                     speaker.say(text, id: "\(id)-\(n)", flash: flash)
                 }
             }

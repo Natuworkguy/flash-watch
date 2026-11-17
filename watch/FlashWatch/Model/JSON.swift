@@ -28,8 +28,34 @@ enum JSON: Decodable, Equatable {
         }
     }
 
+    /// DATA read. JSONSerialization, not the Decodable path above: that one
+    /// tries each kind in turn and throws on every wrong guess, which on a
+    /// watch took long enough on a big answer to freeze the app.
     static func parse(_ data: Data) -> JSON {
-        (try? JSONDecoder().decode(JSON.self, from: data)) ?? .null
+        guard let any = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
+            return .null
+        }
+        return JSON(any: any)
+    }
+
+    init(any: Any) {
+        switch any {
+        case let number as NSNumber:
+            // A JSON true or false arrives as an NSNumber too: told apart by its type.
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                self = .flag(number.boolValue)
+            } else {
+                self = .num(number.doubleValue)
+            }
+        case let text as String:
+            self = .text(text)
+        case let items as [Any]:
+            self = .list(items.map(JSON.init(any:)))
+        case let fields as [String: Any]:
+            self = .dict(fields.mapValues(JSON.init(any:)))
+        default:
+            self = .null
+        }
     }
 
     subscript(key: String) -> JSON {

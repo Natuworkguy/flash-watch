@@ -157,10 +157,12 @@ struct TeamChatView: View {
             let added = fresh.filter { !known.contains($0.id) }
             all += added
             let before = entries.count
-            entries = all
+            // Set only what changed: each set redraws the whole chat.
+            if all != entries { entries = all }
             seq = max(seq, chat["seq"].int)
-            typing = chat["typing"].array.map { $0["spark"].string }
-            problem = nil
+            let nowTyping = chat["typing"].array.map { $0["spark"].string }
+            if nowTyping != typing { typing = nowTyping }
+            if problem != nil { problem = nil }
             if loaded, before > 0, added.contains(where: { !$0.isMine && !$0.isNews }) {
                 WKInterfaceDevice.current().play(.notification)
             }

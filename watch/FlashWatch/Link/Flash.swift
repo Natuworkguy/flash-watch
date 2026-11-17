@@ -242,23 +242,29 @@ final class Flash: ObservableObject {
             // Switched to another computer meanwhile: these are not its.
             guard pairing?.id == asked else { return }
 
-            chats = state["chats"].array.map(ChatItem.init)
+            let newChats = state["chats"].array.map(ChatItem.init)
                 .filter { !$0.id.isEmpty }
                 .sorted { ($0.pinned ? 1 : 0, $0.updated) > ($1.pinned ? 1 : 0, $1.updated) }
-            sparks = state["sparks"].array.map {
+            let newSparks = state["sparks"].array.map {
                 var spark = Spark($0)
                 spark.team = teamOf[spark.id] ?? ""
                 return spark
             }
-            teams = roster["teams"].array.map(Team.init)
-            problem = nil
-            loaded = true
+            let newTeams = roster["teams"].array.map(Team.init)
+            // Set only what changed: every set redraws what shows it, every
+            // few seconds, on a watch.
+            if newChats != chats { chats = newChats }
+            if newSparks != sparks { sparks = newSparks }
+            if newTeams != teams { teams = newTeams }
+            if problem != nil { problem = nil }
+            if !loaded { loaded = true }
         } catch LinkError.unreachable {
             // Out of the house, or the computer asleep: nothing to fix,
             // so nothing alarming. What it said last stays on screen.
-            if pairing != nil { problem = "Can't reach your computer right now." }
+            let said = "Can't reach your computer right now."
+            if pairing != nil, problem != said { problem = said }
         } catch {
-            if pairing != nil { problem = error.localizedDescription }
+            if pairing != nil, problem != error.localizedDescription { problem = error.localizedDescription }
         }
     }
 

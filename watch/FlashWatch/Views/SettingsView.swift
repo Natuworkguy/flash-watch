@@ -63,12 +63,11 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.red)
                 }
+                Note(Text(flash.publicAddress == nil
+                     ? "Turns on your computer's tunnel, so the watch reaches Flash away from your Wi-Fi too. It can take a minute."
+                     : "The watch uses whichever one answers."))
             } header: {
                 Text("Flash")
-            } footer: {
-                Text(flash.publicAddress == nil
-                     ? "Turns on your computer's tunnel, so the watch reaches Flash away from your Wi-Fi too. It can take a minute."
-                     : "The watch uses whichever one answers.")
             }
 
             Section {
@@ -100,19 +99,17 @@ struct SettingsView: View {
                 } label: {
                     Label("Pair another computer", systemImage: "plus")
                 }
+                Note(Text("The watch talks to the one with a check. Tap another to switch."))
             } header: {
                 Text("Computers")
-            } footer: {
-                Text("The watch talks to the one with a check. Tap another to switch.")
             }
 
             Section {
                 Toggle("Replies", isOn: $notifyReplies)
                 Toggle("Questions and Flash's notifications", isOn: $notifyFlash)
+                Note(Text("While Flash is open on the watch, at once. Closed, watchOS checks a few times an hour."))
             } header: {
                 Text("Notify me")
-            } footer: {
-                Text("While Flash is open on the watch, at once. Closed, watchOS checks a few times an hour.")
             }
 
             Section("Replies") {
@@ -128,18 +125,16 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.red)
                 }
+                Note(Text("On, the watch tells Flash where it is when you use it, so Flash can answer \"near me\". Off, it finds nothing and sends nothing, and Flash forgets the last place."))
             } header: {
                 Text("Location")
-            } footer: {
-                Text("On, the watch tells Flash where it is when you use it, so Flash can answer \"near me\". Off, it finds nothing and sends nothing, and Flash forgets the last place.")
             }
 
             Section {
                 Button("Unpair this computer", role: .destructive) {
                     confirming = true
                 }
-            } footer: {
-                Text("Unpairs only the computer in use. To rename this watch or sign it out from the computer, use Watch in Flash's sidebar.")
+                Note(Text("Unpairs only the computer in use. To rename this watch or sign it out from the computer, use Watch in Flash's sidebar."))
             }
         }
         .navigationTitle("Settings")
@@ -169,5 +164,20 @@ struct SettingsView: View {
             problem = error.localizedDescription
             WKInterfaceDevice.current().play(.failure)
         }
+    }
+}
+
+/// A line of explanation under a section's rows: a plain row, not a section
+/// footer (long footers in a watch's list made it stall at the bottom).
+private struct Note: View {
+    let text: Text
+    init(_ text: Text) { self.text = text }
+
+    var body: some View {
+        text
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .listRowBackground(Color.clear)
     }
 }

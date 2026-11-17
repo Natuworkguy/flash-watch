@@ -37,9 +37,10 @@ final class Locator: NSObject, ObservableObject, CLLocationManagerDelegate {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
         case .denied, .restricted:
-            problem = "Allow Location for Flash in the watch's Settings, under Privacy."
+            let said = "Allow Location for Flash in the watch's Settings, under Privacy."
+            if problem != said { problem = said }
         default:
-            problem = nil
+            if problem != nil { problem = nil }
             manager.requestLocation()
         }
     }
@@ -53,8 +54,15 @@ final class Locator: NSObject, ObservableObject, CLLocationManagerDelegate {
         Task { try? await flash.run { try await $0.command("location", arg: "off") } }
     }
 
+    /// The permission last seen: watchOS tells the delegate it changed when it
+    /// is set, and more than once with nothing new.
+    private var lastStatus: CLAuthorizationStatus?
+
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
         Task { @MainActor in
+            guard status != self.lastStatus else { return }
+            self.lastStatus = status
             guard Self.on, let flash = self.flash else { return }
             self.update(flash, force: true)
         }

@@ -213,7 +213,8 @@ async function listDevices() {
   try { found = (await Flash.request("browsers")).browsers || []; } catch { return; }
   const box = $("#devices");
   box.textContent = "";
-  const watches = found.filter((b) => b.paired);
+  // Only watches: other paired devices (a desk robot) are listed by their own extensions.
+  const watches = found.filter((b) => b.paired && (!b.product || b.product === "watch"));
   if (!watches.length) {
     box.innerHTML = '<p class="empty">None yet.</p>';
     return;

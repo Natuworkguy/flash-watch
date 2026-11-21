@@ -18,6 +18,11 @@ your own computer. Nothing goes anywhere else.
 - **Team chats.** Read and write in your teams' chats. Reply to a
   message, react to it, and see every earlier version of a message a
   spark edited.
+- **@mentions.** The @ button by a chat's or team chat's message box
+  lists your sparks: pick one to @mention it in your next message. Or
+  just say it: "at Engineer, check the build" (at the start, or after a
+  comma or full stop) or "@Engineer" anywhere becomes @engineer-spark,
+  and Flash brings that spark in as it does from the page.
 - **Read aloud.** Any reply, read out in Flash's own voice when your
   computer has one, or the watch's. New replies can be read out as they
   arrive.

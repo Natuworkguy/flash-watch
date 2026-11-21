@@ -32,6 +32,8 @@ struct TeamChatView: View {
     @State private var replyingTo: TeamEntry?
     @State private var picked: TeamEntry?
     @State private var history: TeamEntry?
+    @State private var mentioning: Spark?
+    @State private var choosingMention = false
 
     private var team: Team? { flash.team(id) }
 
@@ -80,6 +82,7 @@ struct TeamChatView: View {
         .sheet(item: $history) { entry in
             Versions(entry: entry)
         }
+        .sheet(isPresented: $choosingMention) { mentionSheet }
     }
 
     private var composer: some View {
@@ -100,15 +103,38 @@ struct TeamChatView: View {
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             }
-            TextFieldLink(prompt: Text("Message the team")) {
-                Label("Message", systemImage: "mic.fill")
-                    .frame(maxWidth: .infinity)
-            } onSubmit: { text in
-                Task { await say(text) }
+            if let spark = mentioning {
+                MentioningLine(spark: spark) { mentioning = nil }
             }
-            .tint(team?.color ?? .accentColor)
+            HStack(spacing: 6) {
+                TextFieldLink(prompt: Text("Message the team")) {
+                    Label("Message", systemImage: "mic.fill")
+                        .frame(maxWidth: .infinity)
+                } onSubmit: { text in
+                    Task { await say(text) }
+                }
+                .tint(team?.color ?? .accentColor)
+                mentionButton
+            }
         }
         .padding(.top, 4)
+    }
+
+    /// Opens the list of sparks to @mention.
+    private var mentionButton: some View {
+        Button {
+            choosingMention = true
+        } label: {
+            Image(systemName: "at")
+        }
+        .frame(width: 44)
+        .accessibilityLabel("Mention a spark")
+    }
+
+    private var mentionSheet: some View {
+        NavigationStack {
+            MentionPicker { mentioning = $0 }
+        }
     }
 
     private var typingWords: String {
@@ -127,8 +153,10 @@ struct TeamChatView: View {
 
     private func say(_ text: String) async {
         do {
-            try await flash.say(text, team: id, replyTo: replyingTo?.id ?? 0)
+            let said = Mentions.prefixed(Mentions.resolve(text, sparks: flash.sparks), with: mentioning)
+            try await flash.say(said, team: id, replyTo: replyingTo?.id ?? 0)
             replyingTo = nil
+            mentioning = nil
             await load()
         } catch {
             problem = error.localizedDescription

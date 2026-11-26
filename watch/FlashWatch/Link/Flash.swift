@@ -1,5 +1,7 @@
 import SwiftUI
+import UserNotifications
 import WatchKit
+import WidgetKit
 
 /// Flash on the computer, as this watch knows it: whether it is paired,
 /// the chats, the sparks and their teams, and everything it can ask.
@@ -13,6 +15,8 @@ final class Flash: ObservableObject {
     @Published private(set) var sparks: [Spark] = []
     @Published private(set) var teams: [Team] = []
     @Published private(set) var loaded = false
+    /// Flash's timers and alarms, kept for the widget too.
+    @Published private(set) var clock = ClockSnapshot.load()
     /// Why the last refresh failed, while it keeps failing.
     @Published var problem: String?
     /// Said on the pairing screen when the computer signed this watch out.
@@ -258,6 +262,7 @@ final class Flash: ObservableObject {
             if newTeams != teams { teams = newTeams }
             if problem != nil { problem = nil }
             if !loaded { loaded = true }
+            await refreshClock()
         } catch LinkError.unreachable {
             // Out of the house, or the computer asleep: nothing to fix,
             // so nothing alarming. What it said last stays on screen.
@@ -386,6 +391,68 @@ final class Flash: ObservableObject {
 
     /// What Flash had to tell since note SINCE: replies, questions, its
     /// notifications, mentions.
+    // Timers and alarms ---------------------------------------------
+
+    /// Flash's clock as it stands; the widget and the notifications that
+    /// ring with the app closed follow it.
+    func refreshClock() async {
+        guard let answer = try? await run({ try await $0.command("clock") }) else { return }
+        take(answer)
+    }
+
+    /// One of: timer (length, label), alarm (at, label, days), stop,
+    /// snooze, pause, resume, cancel, add_time (id, length), on, off (id).
+    func clockAct(_ action: String, _ extra: [String: Any] = [:]) async throws {
+        let answer = try await run { try await $0.command("clock-act", arg: action, extra) }
+        take(answer)
+    }
+
+    private func take(_ answer: JSON) {
+        let skew = answer["now"].double > 0 ? Date().timeIntervalSince1970 - answer["now"].double : 0
+        let at = { (secs: Double) -> Date? in secs > 0 ? Date(timeIntervalSince1970: secs + skew) : nil }
+        let items = answer["items"].array.map { j -> ClockEntry in
+            ClockEntry(id: j["id"].string, kind: j["kind"].string, title: j["title"].string,
+                       length: j["length"].double,
+                       ends: j["kind"].string == "timer" && !j["paused"].bool ? at(j["ends"].double) : nil,
+                       remaining: j["remaining"].double, paused: j["paused"].bool,
+                       ringing: at(j["ringing"].double), time: j["time"].string,
+                       repeatText: j["repeat"].string, on: j["on"].bool || j["kind"].string == "timer",
+                       due: at(j["due"].double))
+        }
+        let next = ClockSnapshot(items: items, saved: .now)
+        if next.items == clock.items { return }
+        let wasRinging = Set(clock.ringing.map(\.id))
+        clock = next
+        next.save()
+        WidgetCenter.shared.reloadAllTimelines()
+        Self.scheduleRings(items)
+        if !Set(next.ringing.map(\.id)).subtracting(wasRinging).isEmpty {
+            WKInterfaceDevice.current().play(.notification)
+        }
+    }
+
+    /// A notification at each one's time, so the wrist taps even with the
+    /// app closed; replaced whenever the clock changes.
+    static func scheduleRings(_ items: [ClockEntry]) {
+        let center = UNUserNotificationCenter.current()
+        center.getPendingNotificationRequests { pending in
+            let old = pending.map(\.identifier).filter { $0.hasPrefix("clock.") }
+            center.removePendingNotificationRequests(withIdentifiers: old)
+            for item in items where item.ringing == nil {
+                guard let due = item.due, due.timeIntervalSinceNow > 1 else { continue }
+                let content = UNMutableNotificationContent()
+                content.title = item.title
+                content.body = item.isTimer ? "Time's up." : "It's \(item.time)."
+                content.sound = .defaultCritical
+                content.interruptionLevel = .timeSensitive
+                content.categoryIdentifier = "clock"
+                content.userInfo = ["clock": item.id]
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: due.timeIntervalSinceNow, repeats: false)
+                center.add(UNNotificationRequest(identifier: "clock.\(item.id)", content: content, trigger: trigger))
+            }
+        }
+    }
+
     func notifications(since: Int) async throws -> JSON {
         try await run { try await $0.command("notifications", arg: String(since)) }
     }

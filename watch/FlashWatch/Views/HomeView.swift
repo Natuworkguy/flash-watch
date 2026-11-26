@@ -46,6 +46,9 @@ struct HomeView: View {
                     NavigationLink(value: Route.briefing) {
                         Row(title: "Briefing", icon: "newspaper")
                     }
+                    NavigationLink(value: Route.clock) {
+                        ClockHomeRow(lead: flash.clock.lead)
+                    }
                     NavigationLink(value: Route.sparks) {
                         Row(title: "Sparks", icon: "sparkles",
                             count: flash.sparks.filter(\.needsYou).count,
@@ -95,6 +98,7 @@ struct HomeView: View {
                 case .teams: TeamsView()
                 case .team(let id): TeamChatView(id: id)
                 case .briefing: BriefingView()
+                case .clock: ClockView()
                 case .settings: SettingsView()
                 }
             }
@@ -108,6 +112,10 @@ struct HomeView: View {
             }
         }
         .onAppear { Notes.ask() }
+        // The widget, tapped, opens the clock.
+        .onOpenURL { url in
+            if url.host == "clock" { path.append(Route.clock) }
+        }
         .task(id: phase) {
             guard phase == .active else { return }
             while !Task.isCancelled {
@@ -214,5 +222,32 @@ struct ChatsView: View {
             }
         }
         .navigationTitle("Chats")
+    }
+}
+
+/// The clock's row on the first screen: what rings, or the next countdown.
+struct ClockHomeRow: View {
+    let lead: ClockEntry?
+
+    var body: some View {
+        HStack {
+            Label("Clock", systemImage: lead?.isTimer == false ? "alarm" : "timer")
+            Spacer()
+            if let lead {
+                if lead.ringing != nil {
+                    Text("Ringing").foregroundStyle(.orange)
+                } else if let span = lead.span {
+                    Text(timerInterval: span, countsDown: true)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: 60, alignment: .trailing)
+                } else {
+                    Text(lead.isTimer ? ClockSnapshot.clockText(lead.remaining) : lead.time)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .font(.body)
     }
 }

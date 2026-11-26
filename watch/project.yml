@@ -22,6 +22,14 @@ targets:
     platform: watchOS
     sources:
       - path: FlashWatch
+      - path: Shared
+    dependencies:
+      - target: FlashWidgets
+    entitlements:
+      path: FlashWatch/FlashWatch.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.$(FLASH_BUNDLE_ID)
     settings:
       base:
         PRODUCT_NAME: Flash
@@ -37,4 +45,33 @@ targets:
         NSLocalNetworkUsageDescription: Flash talks to Flash on your own computer, over your Wi-Fi.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+        FlashAppGroup: group.$(FLASH_BUNDLE_ID)
+        CFBundleURLTypes:
+          - CFBundleURLName: flash.clock
+            CFBundleURLSchemes: [flashwatch]
     scheme: {}
+
+  # Flash's next timer or alarm on the watch face and in the Smart Stack.
+  FlashWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: FlashWidgets
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_NAME: FlashWidgets
+        PRODUCT_BUNDLE_IDENTIFIER: $(FLASH_BUNDLE_ID).watchkitapp.widgets
+        SKIP_INSTALL: "YES"
+    entitlements:
+      path: FlashWidgets/FlashWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.$(FLASH_BUNDLE_ID)
+    info:
+      path: FlashWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Flash
+        FlashAppGroup: group.$(FLASH_BUNDLE_ID)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension

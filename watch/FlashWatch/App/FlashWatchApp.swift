@@ -49,6 +49,10 @@ struct RootView: View {
                 NavigationStack { PairView() }
             } else {
                 HomeView()
+                    // A timer or alarm ringing comes over everything.
+                    .fullScreenCover(isPresented: .constant(!flash.clock.ringing.isEmpty && !calls.showing)) {
+                        RingingView().environmentObject(flash)
+                    }
             }
         }
         // A spark calling rings over whatever is on screen, and the call
@@ -77,6 +81,7 @@ struct RootView: View {
 enum Route: Hashable {
     case chat(String)
     case sparks
+    case clock
     case spark(String)
     case teams
     case team(String)

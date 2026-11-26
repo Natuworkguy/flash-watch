@@ -32,6 +32,14 @@ your own computer. Nothing goes anywhere else.
   the app is open it rings at once; closed, a call still ringing when
   watchOS lets the app check comes as a notification with Answer and
   Decline, and one that rang out as a missed call.
+- **Timers and alarms.** Set a timer or an alarm from the wrist, or ask
+  Flash to. Each counts down live with its ring; pause it, give it another
+  minute, or cancel it. When one goes off the watch shows it over
+  everything and taps your wrist until you Stop or Snooze, and it rings
+  on time even with the app closed.
+- **A widget** for the watch face and the Smart Stack: your next timer
+  counting down with a ring that fills, or the next alarm, and "Ringing"
+  while one rings. Tap it for the clock.
 - **The briefing**: each card to read, hear or put away.
 - **A tap on the wrist** when Flash finishes a reply or a spark posts in
   the chat you have open.

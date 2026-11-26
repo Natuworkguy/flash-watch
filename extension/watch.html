@@ -130,7 +130,7 @@ function shown(address) {
 
 async function newCode() {
   let made;
-  try { made = await Flash.request("device-pair"); } catch (error) { Flash.toast(error.message || "Couldn't make a code"); return; }
+  try { made = await Flash.request("device-pair", "watch"); } catch (error) { Flash.toast(error.message || "Couldn't make a code"); return; }
   drawAddresses(made.addresses || []);
   $("#code").textContent = `${made.code.slice(0, 3)} ${made.code.slice(3)}`;
   $("#code").classList.remove("gone");
@@ -303,7 +303,7 @@ const stops = [
 ];
 addEventListener("pagehide", () => {
   for (const stop of stops) stop();
-  Flash.request("device-pair", "cancel").catch(() => {});
+  Flash.request("device-pair", "watch", { cancel: true }).catch(() => {});
 });
 
 newCode();

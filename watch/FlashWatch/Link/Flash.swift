@@ -425,8 +425,8 @@ final class Flash: ObservableObject {
         take(answer)
     }
 
-    /// One of: timer (length, label), alarm (at, label, days), stop,
-    /// snooze, pause, resume, cancel, add_time (id, length), on, off (id).
+    /// One of: stop, snooze, pause, resume, cancel, add_time (id, length),
+    /// on, off (id). Only Flash sets a timer or an alarm: ask it.
     func clockAct(_ action: String, _ extra: [String: Any] = [:]) async throws {
         let answer = try await run { try await $0.command("clock-act", arg: action, extra) }
         take(answer)

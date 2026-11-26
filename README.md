@@ -37,8 +37,8 @@ your own computer. Nothing goes anywhere else.
   the app is open it rings at once; closed, a call still ringing when
   watchOS lets the app check comes as a notification with Answer and
   Decline, and one that rang out as a missed call.
-- **Timers and alarms.** Set a timer or an alarm from the wrist, or ask
-  Flash to. Each counts down live with its ring; pause it, give it another
+- **Timers and alarms.** Ask Flash for one, from the wrist or anywhere:
+  "set a timer for 10 minutes", "wake me at 6:45". Each counts down live with its ring; pause it, give it another
   minute, or cancel it. When one goes off the watch shows it over
   everything and taps your wrist until you Stop or Snooze, and it rings
   on time even with the app closed.
@@ -80,8 +80,8 @@ the app on your watch.
    scripts/watch.sh install
    ```
 
-4. **Pair.** Open **Watch** in Flash's sidebar. It shows an address and a
-   six digit code. Open Flash on the watch and type both. The code works
+4. **Pair.** Open **Devices** in Flash's sidebar (or **Watch**): the Apple
+   Watch section shows an address and a six digit code just for watches. Open Flash on the watch and type both. The code works
    once, for five minutes. With the extension installed, Flash is on your
    network whenever it starts, so there is nothing to turn on.
 

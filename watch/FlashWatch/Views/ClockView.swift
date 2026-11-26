@@ -2,14 +2,11 @@ import SwiftUI
 import WatchKit
 
 /// Flash's timers and alarms: each counting down live with its ring, what
-/// rings at the top with Stop and Snooze, and quick ways to set new ones.
+/// rings at the top with Stop and Snooze. Only Flash sets them: ask it.
 struct ClockView: View {
     @EnvironmentObject private var flash: Flash
     @State private var problem: String?
     @State private var busy = false
-
-    private let presets: [(String, String)] = [("1 min", "1m"), ("3 min", "3m"), ("5 min", "5m"), ("10 min", "10m"),
-                                               ("15 min", "15m"), ("25 min", "25m"), ("1 hour", "1h")]
 
     var body: some View {
         List {
@@ -22,28 +19,9 @@ struct ClockView: View {
             ForEach(flash.clock.items) { item in
                 ClockRow(item: item, act: act)
             }
-            Section("New timer") {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(presets, id: \.1) { label, length in
-                            Button(label) { act("timer", ["length": length]) }
-                                .buttonStyle(.bordered)
-                                .font(.footnote)
-                        }
-                    }
-                }
-                TextFieldLink(prompt: Text("Say how long, e.g. 12 minutes")) {
-                    Label("Other length", systemImage: "timer")
-                } onSubmit: { said in
-                    act("timer", ["length": said.lowercased()])
-                }
-            }
-            Section("New alarm") {
-                TextFieldLink(prompt: Text("Say a time, e.g. 6:45 am")) {
-                    Label("Alarm", systemImage: "alarm")
-                } onSubmit: { said in
-                    act("alarm", ["at": said.lowercased().replacingOccurrences(of: " ", with: "")])
-                }
+            Section {
+                Text("Ask Flash to set one: “set a timer for 10 minutes”, “wake me at 6:45”.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
         }
         .navigationTitle("Clock")

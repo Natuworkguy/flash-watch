@@ -8,5 +8,19 @@
     "panels": [
       {"id": "watch", "label": "Watch", "icon": "clock", "file": "watch.html", "close": false}
     ]
+  },
+  "device": {
+    "label": "Apple Watch",
+    "icon": "clock",
+    "matches": [
+      "watchOS",
+      "Watch"
+    ],
+    "connect": [
+      "Put Flash on the watch from Xcode (see the app link).",
+      "Open Flash on the watch.",
+      "Type Flash's address and the code shown here."
+    ],
+    "app": "https://github.com/Natuworkguy/flash-watch#install"
   }
 }

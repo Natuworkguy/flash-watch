@@ -25,7 +25,7 @@ struct PairView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                TextField("Address", text: $address)
+                TextField("Address (or several, with commas)", text: $address)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 

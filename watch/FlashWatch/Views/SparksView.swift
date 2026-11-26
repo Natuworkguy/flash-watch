@@ -198,3 +198,52 @@ struct SparkView: View {
         }
     }
 }
+
+/// Who to @mention: every spark, as the Sparks list draws them. Picking
+/// one puts its handle in front of the next message.
+struct MentionPicker: View {
+    @EnvironmentObject private var flash: Flash
+    @Environment(\.dismiss) private var dismiss
+    let pick: (Spark) -> Void
+
+    var body: some View {
+        List {
+            if flash.sparks.isEmpty {
+                Text("No sparks yet. Make one in Flash on your computer.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(flash.sparks.filter { !$0.handle.isEmpty }.sorted { $0.name < $1.name }) { spark in
+                Button {
+                    pick(spark)
+                    dismiss()
+                } label: {
+                    SparkRow(spark: spark)
+                }
+            }
+        }
+        .navigationTitle("Mention")
+    }
+}
+
+/// The spark the next message @mentions, above the message box, as a
+/// reply's "Replying to" line is.
+struct MentioningLine: View {
+    let spark: Spark
+    let clear: () -> Void
+
+    var body: some View {
+        HStack {
+            Text("@\(spark.handle)")
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Button(action: clear) {
+                Image(systemName: "xmark.circle.fill")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Don't mention")
+        }
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+    }
+}

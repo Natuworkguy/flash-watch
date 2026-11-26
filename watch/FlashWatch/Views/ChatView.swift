@@ -79,6 +79,8 @@ struct ChatView: View {
     @State private var blocks: [Block] = []
     @State private var problem: String?
     @State private var sending = false
+    @State private var mentioning: Spark?
+    @State private var choosingMention = false
 
     private var busy: Bool { chat?.item.busy ?? false }
 
@@ -125,6 +127,16 @@ struct ChatView: View {
     }
 
     private var composer: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let spark = mentioning {
+                MentioningLine(spark: spark) { mentioning = nil }
+            }
+            composerRow
+        }
+        .sheet(isPresented: $choosingMention) { mentionSheet }
+    }
+
+    private var composerRow: some View {
         HStack(spacing: 6) {
             TextFieldLink(prompt: Text(busy ? "Add to this" : "Reply")) {
                 Label(sending ? "Sending" : "Reply", systemImage: "mic.fill")
@@ -134,6 +146,8 @@ struct ChatView: View {
             }
             .disabled(sending)
             .tint(.accentColor)
+
+            if !busy { mentionButton }
 
             if busy {
                 Button {
@@ -149,11 +163,30 @@ struct ChatView: View {
         .padding(.top, 4)
     }
 
+    /// Opens the list of sparks to @mention.
+    private var mentionButton: some View {
+        Button {
+            choosingMention = true
+        } label: {
+            Image(systemName: "at")
+        }
+        .frame(width: 44)
+        .accessibilityLabel("Mention a spark")
+    }
+
+    private var mentionSheet: some View {
+        NavigationStack {
+            MentionPicker { mentioning = $0 }
+        }
+    }
+
     private func send(_ text: String) async {
         sending = true
         defer { sending = false }
         do {
-            try await flash.send(text, to: id)
+            let said = Mentions.prefixed(Mentions.resolve(text, sparks: flash.sparks), with: mentioning)
+            try await flash.send(said, to: id)
+            mentioning = nil
             await load()
         } catch {
             problem = error.localizedDescription

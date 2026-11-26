@@ -44,6 +44,8 @@ struct ChatDetail: Equatable {
 struct Spark: Identifiable, Equatable, Hashable {
     let id: String
     var name: String
+    /// What @mentions it, without the @: scout-spark.
+    var handle: String = ""
     var title: String
     var colour: String
     var status: String
@@ -67,6 +69,7 @@ struct Spark: Identifiable, Equatable, Hashable {
         answering = json["answering"].bool
         unread = json["unread"].int
         waitingOn = json["waiting_on"].string
+        handle = Mentions.bare(json["handle"].string)
         pendingLabel = json["pending"]["label"].string
         pendingDetail = json["pending"]["detail"].string
     }
@@ -187,4 +190,58 @@ func ago(_ seconds: Double) -> String {
     if gone < 86400 { return "\(Int(gone / 3600))h" }
     if gone < 6 * 86400 { return then.formatted(.dateTime.weekday(.abbreviated)) }
     return then.formatted(.dateTime.month(.abbreviated).day())
+}
+
+/// @mentions, as the page and the terminal take them: an @handle in a
+/// message calls that spark in, and Flash routes it. Dictation cannot
+/// write one, so a spark's spoken name becomes its handle here.
+enum Mentions {
+    /// TEXT with "@Engineer", "@ engineer" anywhere, or "at Engineer" at
+    /// the start or after a comma or a sentence's end, made "@engineer-spark".
+    static func resolve(_ text: String, sparks: [Spark]) -> String {
+        var out = text
+        // Longest names first, so "Dev Team Manager" wins over "Dev".
+        let named = sparks.filter { !$0.handle.isEmpty }
+            .flatMap { spark in spoken(spark).map { ($0, bare(spark.handle)) } }
+            .sorted { $0.0.count > $1.0.count }
+        for (words, handle) in named {
+            let name = words.split(separator: " ")
+                .map { NSRegularExpression.escapedPattern(for: String($0)) }
+                .joined(separator: "[\\s-]+")
+            let pattern = "(?<![\\w@./])(?:@\\s*|(?:^|(?<=[,.!?;:]\\s))at\\s+)"
+                + name + "(?:-spark)?(?![\\w-])"
+            guard let re = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { continue }
+            let range = NSRange(out.startIndex..., in: out)
+            out = re.stringByReplacingMatches(
+                in: out, range: range,
+                withTemplate: NSRegularExpression.escapedTemplate(for: "@" + handle))
+        }
+        return out
+    }
+
+    /// A handle without any leading @, as Flash sends it with one.
+    static func bare(_ handle: String) -> String {
+        String(handle.drop { $0 == "@" })
+    }
+
+    /// The ways to say a spark: its name, and its handle without -spark.
+    private static func spoken(_ spark: Spark) -> [String] {
+        var short = bare(spark.handle).lowercased()
+        if short.hasSuffix("-spark") { short.removeLast(6) }
+        let base = short.replacingOccurrences(of: "-", with: " ")
+        let name = spark.name.trimmingCharacters(in: .whitespaces)
+        return Array(Set([name.lowercased(), base].filter { !$0.isEmpty }))
+    }
+
+    /// TEXT with MENTIONING's handle in front, unless it names it already.
+    static func prefixed(_ text: String, with mentioning: Spark?) -> String {
+        guard let spark = mentioning, !bare(spark.handle).isEmpty else { return text }
+        let handle = bare(spark.handle)
+        let short = handle.hasSuffix("-spark") ? String(handle.dropLast(6)) : handle
+        let lower = text.lowercased()
+        if lower.contains("@" + handle.lowercased()) || lower.contains("@" + short.lowercased()) {
+            return text
+        }
+        return "@\(handle) " + text
+    }
 }

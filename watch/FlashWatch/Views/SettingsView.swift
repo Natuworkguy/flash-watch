@@ -6,6 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject private var flash: Flash
     @AppStorage(Prefs.readAloud) private var readAloud = false
     @AppStorage(Prefs.flashVoice) private var flashVoice = true
+    @AppStorage("updateComputerAddresses") private var updateComputerAddresses = true
     @AppStorage(Prefs.shortReplies) private var shortReplies = true
     @AppStorage(Prefs.notifyReplies) private var notifyReplies = true
     @AppStorage(Prefs.notifyFlash) private var notifyFlash = true
@@ -110,6 +111,12 @@ struct SettingsView: View {
                 Note(Text("While Flash is open on the watch, at once. Closed, watchOS checks a few times an hour."))
             } header: {
                 Text("Notify me")
+            }
+
+            Section {
+                Toggle("Update computer addresses", isOn: $updateComputerAddresses)
+            } footer: {
+                Text("Turn off to keep your saved addresses instead of accepting new local IP addresses from Flash.")
             }
 
             Section("Replies") {

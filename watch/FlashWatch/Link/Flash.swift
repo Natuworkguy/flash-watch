@@ -44,15 +44,29 @@ final class Flash: ObservableObject {
     // Pairing --------------------------------------------------------
 
     func pair(address typed: String, code typedCode: String) async throws {
-        let address = try FlashClient.normalized(typed)
+        // Several may be typed, split by commas: each is tried in turn
+        // until one answers, and all of them are kept.
+        let typedAll = try typed.split(separator: ",").map { try FlashClient.normalized(String($0)) }
+        guard !typedAll.isEmpty else { throw LinkError.badAddress }
         let code = try FlashClient.code(typedCode)
-        let key = try await FlashClient(base: address)
-            .pair(code: code, name: Self.deviceName)
+        var address = typedAll[0]
+        var key = ""
+        for (index, candidate) in typedAll.enumerated() {
+            do {
+                key = try await FlashClient(base: candidate, timeout: typedAll.count > 1 ? 4 : 10)
+                    .pair(code: code, name: Self.deviceName)
+                address = candidate
+                break
+            } catch LinkError.unreachable where index < typedAll.count - 1 {
+                continue
+            }
+        }
         signedOutNote = nil
         // Paired again with one it knew: that one, with its new key.
         var found = servers.first { $0.addresses.contains(address) }
-            ?? Pairing(address: address, addresses: [address], key: key)
+            ?? Pairing(address: address, addresses: typedAll, key: key)
         found.address = address
+        for other in typedAll where !found.addresses.contains(other) { found.addresses.append(other) }
         found.key = key
         save(found)
         use(found.id)
@@ -137,9 +151,18 @@ final class Flash: ObservableObject {
         guard let pairing else { throw LinkError.signedOut }
         let order = [pairing.address] + pairing.addresses.filter { $0 != pairing.address }
         var failed: Error = LinkError.unreachable(FlashClient.hostOf(pairing.address))
+        // With others to fall back on, each address gets a quick knock
+        // first, so one that never answers (a VPN's, an old Wi-Fi's) costs
+        // seconds, not the full wait. The one that just answered skips it.
+        let fresh = Date().timeIntervalSince(answeredAt) < 60
         for address in order {
             do {
+                if order.count > 1, !(fresh && address == pairing.address) {
+                    _ = try await FlashClient(base: address, key: pairing.key, timeout: 3)
+                        .get("/api/state?lite=1")
+                }
                 let result = try await work(FlashClient(base: address, key: pairing.key))
+                answeredAt = Date()
                 if address != self.pairing?.address, var now = self.pairing, now.id == pairing.id {
                     now.address = address
                     save(now)
@@ -163,6 +186,8 @@ final class Flash: ObservableObject {
     // Addresses ------------------------------------------------------
 
     private var syncedAt = Date.distantPast
+    /// When the address tried first last answered.
+    private var answeredAt = Date.distantPast
     private var syncing = false
 
     /// The public link, while the computer has one on.
@@ -176,7 +201,8 @@ final class Flash: ObservableObject {
     /// Never a problem to show: away from home the Wi-Fi address cannot
     /// answer, and that is as it should be.
     func syncAddresses(force: Bool = false) async {
-        guard pairing != nil, !syncing, force || Date().timeIntervalSince(syncedAt) > 60 else { return }
+        let updateAddresses = UserDefaults.standard.object(forKey: "updateComputerAddresses") as? Bool ?? true
+        guard updateAddresses, pairing != nil, !syncing, force || Date().timeIntervalSince(syncedAt) > 60 else { return }
         syncing = true
         defer { syncing = false }
         syncedAt = Date()
@@ -184,17 +210,16 @@ final class Flash: ObservableObject {
         guard let told = try? await run({ try await $0.command("addresses") }),
               var now = pairing, now.id == asked else { return }
         let found = told["addresses"].array.map(\.string).filter { !$0.isEmpty }
-        // Where Flash says it is on the Wi-Fi now replaces where it was: an
-        // address that changed is put right. Only when it says none (its
-        // network access is off for now) are the ones known kept.
-        let saysLocal = found.contains(where: FlashClient.isLocal)
-        let kept = saysLocal ? [] : now.addresses.filter(FlashClient.isLocal)
+        // Where Flash says it is now comes first, in its order; the ones
+        // known before are kept after them, since one that failed once (on
+        // another network, say) may answer again. Twelve at most.
         var all: [String] = []
-        for address in found + kept where !all.contains(address) {
+        for address in found + now.addresses where !all.contains(address) {
             all.append(address)
         }
+        all = Array(all.prefix(12))
         // Wi-Fi first: at home it is the quicker way.
-        all.sort { FlashClient.isLocal($0) && !FlashClient.isLocal($1) }
+        all = all.filter(FlashClient.isLocal) + all.filter { !FlashClient.isLocal($0) }
         guard !all.isEmpty else { return }
         now.addresses = all
         if !all.contains(now.address) { now.address = all[0] }

@@ -49,8 +49,12 @@ struct RootView: View {
                 NavigationStack { PairView() }
             } else {
                 HomeView()
-                    // A timer or alarm ringing comes over everything.
-                    .fullScreenCover(isPresented: .constant(!flash.clock.ringing.isEmpty && !calls.showing)) {
+                    // A timer or alarm ringing comes over everything,
+                    // until it stops or is closed here.
+                    .fullScreenCover(isPresented: Binding(
+                        get: { !flash.ringingHere.isEmpty && !calls.showing },
+                        set: { if !$0 { flash.quiet() } }
+                    )) {
                         RingingView().environmentObject(flash)
                     }
             }

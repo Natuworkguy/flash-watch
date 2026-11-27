@@ -137,20 +137,28 @@ struct RingingView: View {
     @State private var pulse = false
 
     var body: some View {
-        if let item = flash.clock.ringing.first {
-            VStack(spacing: 10) {
-                Image(systemName: item.isTimer ? "timer" : "alarm.waves.left.and.right")
-                    .font(.system(size: 34, weight: .semibold))
-                    .foregroundStyle(.orange)
-                    .scaleEffect(pulse ? 1.12 : 0.94)
-                    .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: pulse)
-                Text(item.title).font(.headline).lineLimit(2).multilineTextAlignment(.center)
-                Text(item.isTimer ? "Time's up" : item.time).font(.footnote).foregroundStyle(.secondary)
-                HStack {
-                    Button("Snooze") { act("snooze", item) }.tint(.gray)
-                    Button("Stop") { act("stop", item) }.tint(.orange)
+        if let item = flash.ringingHere.first {
+            // Scrolls, so Close still fits on the smallest watch.
+            ScrollView {
+                VStack(spacing: 10) {
+                    Image(systemName: item.isTimer ? "timer" : "alarm.waves.left.and.right")
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(.orange)
+                        .scaleEffect(pulse ? 1.12 : 0.94)
+                        .animation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true), value: pulse)
+                    Text(item.title).font(.headline).lineLimit(2).multilineTextAlignment(.center)
+                    Text(item.isTimer ? "Time's up" : item.time).font(.footnote).foregroundStyle(.secondary)
+                    HStack {
+                        Button("Snooze") { act("snooze", item) }.tint(.gray)
+                        Button("Stop") { act("stop", item) }.tint(.orange)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button("Close") { flash.quiet() }
+                        .buttonStyle(.plain)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
             }
             .onAppear { pulse = true }
             .task(id: item.id) {

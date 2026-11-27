@@ -66,7 +66,7 @@ enum JSON: Decodable, Equatable {
     var string: String {
         switch self {
         case .text(let text): return text
-        case .num(let n): return n == n.rounded() ? String(Int(n)) : String(n)
+        case .num(let n): return n == n.rounded() && abs(n) < 9e18 ? String(Int(n)) : String(n)
         default: return ""
         }
     }
@@ -79,7 +79,11 @@ enum JSON: Decodable, Equatable {
         }
     }
 
-    var int: Int { Int(double) }
+    /// Zero for a number no Int can hold, rather than a crash.
+    var int: Int {
+        let n = double
+        return n.isFinite && abs(n) < 9e18 ? Int(n) : 0
+    }
 
     var bool: Bool {
         switch self {

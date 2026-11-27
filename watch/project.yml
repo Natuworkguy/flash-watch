@@ -43,6 +43,8 @@ targets:
         WKApplication: true
         WKWatchOnly: true
         NSLocalNetworkUsageDescription: Flash talks to Flash on your own computer, over your Wi-Fi.
+        # Info.plist is written from these on every build: every key the app needs goes here.
+        NSLocationWhenInUseUsageDescription: 'Only while "Let Flash see my location" is on: Flash on your computer is told where you are, so it can answer things like "what''s near me".'
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
         FlashAppGroup: group.$(FLASH_BUNDLE_ID)

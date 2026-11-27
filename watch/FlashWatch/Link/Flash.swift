@@ -17,6 +17,12 @@ final class Flash: ObservableObject {
     @Published private(set) var loaded = false
     /// Flash's timers and alarms, kept for the widget too.
     @Published private(set) var clock = ClockSnapshot.load()
+    /// Whether Flash has told the clock since the app opened. What was
+    /// saved before may ring no more, so it rings nothing until then.
+    @Published private(set) var clockHeard = false
+    /// Rings closed on the watch: they stop coming over everything, and
+    /// still show on the Clock page with Stop and Snooze.
+    @Published private(set) var quieted: Set<String> = []
     /// Why the last refresh failed, while it keeps failing.
     @Published var problem: String?
     /// Said on the pairing screen when the computer signed this watch out.
@@ -432,6 +438,17 @@ final class Flash: ObservableObject {
         take(answer)
     }
 
+    /// What rings over everything now.
+    var ringingHere: [ClockEntry] {
+        clockHeard ? clock.ringing.filter { !quieted.contains($0.id) } : []
+    }
+
+    /// Closes what rings over everything, on the watch only: with Flash
+    /// out of reach, Stop and Snooze can't, and nothing else could.
+    func quiet() {
+        quieted.formUnion(clock.ringing.map(\.id))
+    }
+
     private func take(_ answer: JSON) {
         let skew = answer["now"].double > 0 ? Date().timeIntervalSince1970 - answer["now"].double : 0
         let at = { (secs: Double) -> Date? in secs > 0 ? Date(timeIntervalSince1970: secs + skew) : nil }
@@ -445,6 +462,10 @@ final class Flash: ObservableObject {
                        due: at(j["due"].double))
         }
         let next = ClockSnapshot(items: items, saved: .now)
+        if !clockHeard { clockHeard = true }
+        // One that stopped and rings again later rings again here too.
+        let still = quieted.intersection(next.ringing.map(\.id))
+        if still != quieted { quieted = still }
         if next.items == clock.items { return }
         let wasRinging = Set(clock.ringing.map(\.id))
         clock = next
